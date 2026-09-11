@@ -15,7 +15,7 @@ description: 05-02-review-translation完了後のCSVを検証しDB（Postgres互
 
 ## 入出力
 - 入力: `<OUT>/<論文名>/<論文名>.csv`
-- 入力（任意）: `pdf/<file_name>.drive_id`（`01-01-fetch-pdf`が作成するサイドカーファイル）。存在すればその内容を`papers.drive_file_id`へ保存し、無ければ`drive_file_id`はnullになる
+- 入力（任意）: `output/<論文名>/<論文名>.drive_id`（`01-01-fetch-pdf`が作成するサイドカーファイル）。存在すればその内容を`papers.drive_file_id`へ保存し、無ければ`drive_file_id`はnullになる
 - 出力: DBの`papers`テーブル・`sentences`テーブル（スキーマは`postprocess/src/db/models.py`で定義）
 
 ## 手順

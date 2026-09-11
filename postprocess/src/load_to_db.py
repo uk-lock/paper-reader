@@ -98,12 +98,13 @@ def validate_csv(rows: list[dict[str, str]]) -> list[str]:
     return errors
 
 
-def read_drive_file_id(file_name: str) -> str | None:
-    """`pdf/<file_name>.drive_id`（01-01-fetch-pdfがDrive検索時に記録するサイドカー）を読む。
+def read_drive_file_id(csv_path: Path, paper_id: str) -> str | None:
+    """`<論文名>.drive_id`（01-01-fetch-pdfがDrive検索時に記録するサイドカー）を読む。
 
-    ファイルが無い場合（ローカルにのみ存在しDrive検索で見つからなかった場合）はNoneを返す。
+    CSVと同じ`output/<論文名>/`ディレクトリに置かれる想定。ファイルが無い場合
+    （ローカルにのみ存在しDrive検索で見つからなかった場合）はNoneを返す。
     """
-    sidecar_path = Path("pdf") / f"{file_name}.drive_id"
+    sidecar_path = csv_path.parent / f"{paper_id}.drive_id"
     if not sidecar_path.is_file():
         return None
     content = sidecar_path.read_text(encoding="utf-8").strip()
@@ -227,7 +228,7 @@ def main() -> None:
     paper_id = rows[0]["paper_id"]
     file_name = f"{paper_id}.pdf"
     title = derive_title(rows)
-    drive_file_id = read_drive_file_id(file_name)
+    drive_file_id = read_drive_file_id(args.csv_path, paper_id)
 
     try:
         engine = create_db_engine()
