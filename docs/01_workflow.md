@@ -73,7 +73,7 @@ flowchart LR
 <tr><th>#</th><th>Flow_Lv1</th><th>Flow_Lv2</th><th>Skill</th><th>実行主体</th><th>入力</th><th>出力</th></tr>
 </thead>
 <tbody>
-<tr><td>1</td><td>PDFの取得</td><td>対象PDFの<code>pdf/</code>への準備(ローカル確認→無ければGoogle Driveから取得)</td><td><a href="../.claude/skills/01-01-fetch-pdf/SKILL.md">01-01-fetch-pdf</a></td><td>LLM</td><td>対象PDFのファイル名</td><td><code>pdf/&lt;論文名&gt;.pdf</code>(ローカルに無ければGoogle Driveから取得)</td></tr>
+<tr><td>1</td><td>PDFの取得</td><td>対象PDFの<code>pdf/</code>への準備(Google Drive検索→無ければローカル確認)</td><td><a href="../.claude/skills/01-01-fetch-pdf/SKILL.md">01-01-fetch-pdf</a></td><td>LLM</td><td>対象PDFのファイル名</td><td><code>pdf/&lt;論文名&gt;.pdf</code>(ローカルに無ければGoogle Driveから取得)</td></tr>
 <tr><td>2</td><td>PDF→Markdown抽出</td><td>PDFのMarkdown変換(marker-pdf + PyMuPDF)</td><td><a href="../.claude/skills/02-01-extract-pdf/SKILL.md">02-01-extract-pdf</a></td><td>Program(<code>make extract</code>)</td><td><code>pdf/&lt;論文名&gt;.pdf</code></td><td><code>output/&lt;論文名&gt;/&lt;論文名&gt;.md</code>、<code>tables/</code>(表画像)</td></tr>
 <tr><td>3</td><td rowspan="3">Markdownの見出し構造・数式の精度担保</td><td>見出し(<code>#</code>の数・親子関係)の元PDF章立てとの一致</td><td><a href="../.claude/skills/03-01-fix-heading-structure/SKILL.md">03-01-fix-heading-structure</a></td><td>LLM</td><td><code>&lt;論文名&gt;.md</code></td><td><code>&lt;論文名&gt;_review.md</code>(新規作成。以降はこれを編集)</td></tr>
 <tr><td>4</td><td>章ごとの元PDF該当ページとの突き合わせによる数式修正</td><td><a href="../.claude/skills/03-02-review-chapter/SKILL.md">03-02-review-chapter</a></td><td>LLM</td><td><code>&lt;論文名&gt;_review.md</code>、元PDF</td><td><code>&lt;論文名&gt;_review.md</code>(数式修正)</td></tr>
@@ -90,6 +90,7 @@ flowchart LR
 ## 中間ファイルの遷移（`output/<論文名>/`配下）
 
 ```
+pdf/<ファイル名>.drive_id … 01-01-fetch-pdfがDrive検索でファイルを見つけた場合のみ作成。06-01-load-to-dbが読み取る
 <論文名>.md              … 02-01の出力。以降変更しない（差分確認の基準）
 <論文名>_review.md       … 03-01で作成。03-02〜03-03で数式を修正
 <論文名>.csv             … 04-01で作成。04-02で分割誤りを修正 → 05-01/05-02でtranslated_text列を埋める

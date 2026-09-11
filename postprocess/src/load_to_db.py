@@ -98,6 +98,18 @@ def validate_csv(rows: list[dict[str, str]]) -> list[str]:
     return errors
 
 
+def read_drive_file_id(file_name: str) -> str | None:
+    """`pdf/<file_name>.drive_id`（01-01-fetch-pdfがDrive検索時に記録するサイドカー）を読む。
+
+    ファイルが無い場合（ローカルにのみ存在しDrive検索で見つからなかった場合）はNoneを返す。
+    """
+    sidecar_path = Path("pdf") / f"{file_name}.drive_id"
+    if not sidecar_path.is_file():
+        return None
+    content = sidecar_path.read_text(encoding="utf-8").strip()
+    return content or None
+
+
 def derive_title(rows: list[dict[str, str]]) -> str:
     """最初のH1見出し（type=heading, heading_level=1）のテキストをタイトルとする。
 
@@ -125,10 +137,15 @@ def save_to_db(
     file_name: str,
     title: str,
     processing_status: str,
+    drive_file_id: str | None,
 ) -> int:
     """DBへpapers・sentencesをupsertし、保存後の件数を返す（保存結果の検証用）。"""
     paper_stmt = pg_insert(Paper).values(
-        paper_id=paper_id, file_name=file_name, title=title, processing_status=processing_status
+        paper_id=paper_id,
+        file_name=file_name,
+        title=title,
+        processing_status=processing_status,
+        drive_file_id=drive_file_id,
     )
     paper_stmt = paper_stmt.on_conflict_do_update(
         index_elements=[Paper.paper_id],
@@ -136,6 +153,7 @@ def save_to_db(
             "file_name": paper_stmt.excluded.file_name,
             "title": paper_stmt.excluded.title,
             "processing_status": paper_stmt.excluded.processing_status,
+            "drive_file_id": paper_stmt.excluded.drive_file_id,
         },
     )
     session.execute(paper_stmt)
@@ -209,11 +227,14 @@ def main() -> None:
     paper_id = rows[0]["paper_id"]
     file_name = f"{paper_id}.pdf"
     title = derive_title(rows)
+    drive_file_id = read_drive_file_id(file_name)
 
     try:
         engine = create_db_engine()
         with Session(engine) as session:
-            saved_count = save_to_db(session, rows, paper_id, file_name, title, args.status)
+            saved_count = save_to_db(
+                session, rows, paper_id, file_name, title, args.status, drive_file_id
+            )
     except RuntimeError as e:
         # create_db_engine()が接続文字列未設定時に送出するエラー
         print(f"エラー: {e}", file=sys.stderr)
@@ -226,7 +247,7 @@ def main() -> None:
         )
         sys.exit(1)
 
-    print(f"保存完了: paper_id={paper_id!r}, title={title!r}")
+    print(f"保存完了: paper_id={paper_id!r}, title={title!r}, drive_file_id={drive_file_id!r}")
     print(f"保存件数の検証: CSV {len(rows)}行 -> DB {saved_count}件", end="")
     if saved_count == len(rows):
         print(" (一致)")
