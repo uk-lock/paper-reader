@@ -38,9 +38,21 @@ flowchart LR
     style repo fill:#F8FAFF,stroke:#3B5BDB
 ```
 
-## 3. 実行手順例
+## 3. 前提条件
 
-### 3.1 通常の流れ（Claude Code / Codexに一任する）
+- Claude Code または Codex（本リポジトリのSkill実行に必要。Skillは`.claude/skills/`・`.agents/skills/`に定義）
+- Claude CodeへのGoogle Drive MCPコネクタ（プラグイン）追加
+- GPT Site（論文の原文・翻訳を閲覧するアプリ。本リポジトリの範囲外だが、前処理結果の閲覧側として必要）
+- Postgres互換DB（開発時はNeonを想定）。接続文字列は`config/settings.local.toml`の`[db].connection_string`に設定
+- rclone。事前に`rclone config`でGoogle DriveへのOAuth認可済みリモートを作成しておくこと
+  （`01-01-fetch-pdf`がGoogle Drive上のPDF取得に使用）。リモート名は`config/settings.toml`の`[gdrive].remote`、
+  Drive上のフォルダパスは`config/settings.local.toml`の`[gdrive].pdf_folder`に設定
+- Docker（`preprocess/`のPDF→Markdown抽出〔marker-pdf + PyMuPDF〕用devcontainerイメージビルドに必要。
+  `postprocess/`は軽量venv〔uv管理〕のためDocker不要）
+
+## 4. 実行手順例
+
+### 4.1 通常の流れ（Claude Code / Codexに一任する）
 
 1. 対象PDFを`pdf/<論文名>.pdf`に配置する（無くてもよい。無ければ`01-01-fetch-pdf`がGoogle Driveから取得する）
 2. Claude Code もしくは Codex に「`pdf/<論文名>.pdf`を処理して」のように指示する
@@ -48,7 +60,7 @@ flowchart LR
 指示を受けたLLMは、[docs/01_workflow.md](docs/01_workflow.md)に定義された`01-01-fetch-pdf`〜`06-01-load-to-db`の
 Skillを順番に実行し、PDF取得からDB格納まで通しで進める。
 
-### 3.2 特定の処理だけ切り出したい場合
+### 4.2 特定の処理だけ切り出したい場合
 
 決定論的な処理（Skillを介さない）は`Makefile`にターゲットとして定義済みなので、直接呼び出せる。
 
@@ -62,7 +74,7 @@ make load-db CSV=output/paper/paper.csv  # CSV→DB格納
 上記以外のターゲット（`lint`/`format`/`format-check`/`clean`/`db-revision`等）を含む一覧は`make help`で確認できる。
 詳細は[Makefile](Makefile)を参照。
 
-## 4. フォルダ構成
+## 5. フォルダ構成
 
 ```
 paper-reader/
@@ -80,7 +92,7 @@ paper-reader/
 └── Makefile              # 各Programの実行コマンド集
 ```
 
-## 5. 出力内容
+## 6. 出力内容
 
 ### output/`<論文名>`/ 配下
 
