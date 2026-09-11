@@ -38,10 +38,10 @@ REQUIRED_COLUMNS = [
     "original_text",
     "translated_text",
 ]
-# 翻訳対象外（type=reference）はtranslated_textが空欄でも欠損とみなさない。
-# 04_01_split_sentences.md / 05_01_translate.md と同じtype一覧。
+# 翻訳対象外（type=reference/image）はtranslated_textが空欄でも欠損とみなさない。
+# 05_01_split_sentences.md / 06_01_translate.md と同じtype一覧。
 TRANSLATABLE_TYPES = {"heading", "body", "caption", "footnote"}
-VALID_TYPES = TRANSLATABLE_TYPES | {"reference"}
+VALID_TYPES = TRANSLATABLE_TYPES | {"reference", "image"}
 
 
 def read_csv(csv_path: Path) -> list[dict[str, str]]:

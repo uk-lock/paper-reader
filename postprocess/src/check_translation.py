@@ -1,7 +1,7 @@
 """翻訳結果（translated_text列）を機械的に検証するProgram。
 
-`05_02_review_translation.md`（校正者）向けに、怪しい行を自動検出して
-`<論文名>_translation_flags.csv`へ出力する。`04_01_split_sentences.md`の`find_flags`と
+`06_02_review_translation.md`（校正者）向けに、怪しい行を自動検出して
+`<論文名>_translation_flags.csv`へ出力する。`05_01_split_sentences.md`の`find_flags`と
 同じ考え方（決定論的に検出できるものはPythonで拾い、LLMは判断が必要な箇所に集中する）。
 
 使い方:
@@ -17,7 +17,7 @@ from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
-# 翻訳対象のtype。referenceは翻訳しない方針（04_02_review_split.md以降と同じCSV仕様）。
+# 翻訳対象のtype。referenceは翻訳しない方針（05_02_review_split.md以降と同じCSV仕様）。
 TRANSLATABLE_TYPES = {"heading", "body", "caption", "footnote"}
 
 MATH_RE = re.compile(r"\$\$.*?\$\$|\$[^$\n]+?\$", re.DOTALL)
@@ -52,6 +52,11 @@ def check_row(row: dict[str, str]) -> list[str]:
     if row["type"] == "reference":
         if translated.strip():
             reasons.append("reference_should_not_be_translated")
+        return reasons
+
+    if row["type"] == "image":
+        if translated.strip():
+            reasons.append("image_should_not_be_translated")
         return reasons
 
     if row["type"] not in TRANSLATABLE_TYPES:

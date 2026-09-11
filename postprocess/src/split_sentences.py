@@ -1,8 +1,10 @@
 """<論文名>_review.md を文単位に分割し、CSVへ出力するProgram。
 
-パイプラインの Step 4（文章分割・CSV出力）に対応する。
+パイプラインの Step 5（文章分割・CSV出力）に対応する。
 
-- 見出し・図表キャプション・参照文献リストもレコード化する（`type` 列で区別）
+- 見出し・図表キャプション・参照文献リスト・画像参照もレコード化する（`type` 列で区別）
+- 画像参照（`type=image`）はDrive URL込みのMarkdown画像記法をそのまま`original_text`へ格納する
+  （`03-01-upload-images`が事前にローカルパスをURLへ書き換えている前提。翻訳対象外）
 - 数式（$...$ / $$...$$）は文中に温存し、内部のピリオドでは分割しない
 - page_number は現状取得不可のため空欄のまま出力する（将来 marker-pdf の
   paginate_output を導入した際に埋める想定）
@@ -133,8 +135,15 @@ def classify_and_split(blocks: list[str]) -> list[Record]:
             records.append(Record(order=order, type="heading", heading_level=level, text=title))
             continue
 
-        if IMAGE_ONLY_RE.match(block) or HR_ONLY_RE.match(block):
-            # 画像・表参照のみ、区切り線（---等）のみのブロックはレコード化しない
+        if HR_ONLY_RE.match(block):
+            # 区切り線（---等）のみのブロックはレコード化しない
+            continue
+
+        if IMAGE_ONLY_RE.match(block):
+            # 画像参照（表・図の両方）はtype=imageとして1レコード化する。original_textには
+            # Markdown画像記法をそのまま格納する（03-01-upload-images書き換え後はDrive URL込み）。
+            order += 1
+            records.append(Record(order=order, type="image", heading_level=None, text=block))
             continue
 
         if in_references:
@@ -161,7 +170,7 @@ def classify_and_split(blocks: list[str]) -> list[Record]:
     return records
 
 
-# 04_02_review_split.md（LLMレビュー）向けの自動フラグ検出。決定論的なヒューリスティックのみを
+# 05_02_review_split.md（LLMレビュー）向けの自動フラグ検出。決定論的なヒューリスティックのみを
 # 扱い、判定に迷う場合は「見逃すより多めにフラグを立てる」側に倒す（false positiveは許容し、
 # 最終判断はLLMに委ねる）。heading・referenceは正常でも短文・句読点なしが普通なので対象外。
 FLAG_TARGET_TYPES = {"body", "caption", "footnote"}
@@ -275,7 +284,7 @@ def split_review_markdown(
     """review.mdを分割してCSVへ出力する。
 
     (CSV出力先パス, フラグCSV出力先パス, フラグ件数) を返す。
-    フラグCSVは `04_02_review_split.md` がLLMレビュー対象を絞り込むための入力。
+    フラグCSVは `05_02_review_split.md` がLLMレビュー対象を絞り込むための入力。
     """
     paper_id = paper_id or derive_paper_id(review_md_path)
     output_path = output_path or review_md_path.with_name(f"{paper_id}.csv")

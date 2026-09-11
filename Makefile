@@ -29,6 +29,10 @@ ARGS ?=
 #   REVIEW: 分割対象の <論文名>_review.md（リポジトリルートからの相対パス）
 REVIEW ?=
 
+# upload-images 実行時のデフォルト値。
+#   MD: アップロード対象の <論文名>.md（extract_pdf.pyの出力。リポジトリルートからの相対パス）
+MD ?=
+
 # load-db 実行時のデフォルト値。
 #   CSV: DBへ保存する <論文名>.csv（リポジトリルートからの相対パス）
 CSV ?=
@@ -37,11 +41,13 @@ CSV ?=
 #   MSG: 生成するAlembicマイグレーションの説明文
 MSG ?=
 
-.PHONY: help build-preprocess extract clean postprocess-venv split lint format format-check db-upgrade db-revision load-db
+.PHONY: help build-preprocess extract clean postprocess-venv upload-images split lint format format-check db-upgrade db-revision load-db
 
 help:
 	@echo "make build-preprocess                         # preprocess用devcontainerイメージをビルド"
 	@echo "make extract PDF=pdf/paper.pdf OUT=output   # extract_pdf.py を実行（終了後コンテナは自動削除）"
+	@echo "make upload-images MD=output/example/example.md"
+	@echo "                                               # 画像をGoogle Driveへアップロードし、Markdownの参照をURLへ書き換え"
 	@echo "make split REVIEW=output/example/example_review.md"
 	@echo "                                               # split_sentences.py を実行（Docker不要、軽量venv使用）"
 	@echo "make db-upgrade                               # Alembicマイグレーションを最新まで適用（venv自動構築）"
@@ -77,6 +83,12 @@ postprocess-venv:
 		uv venv "$(POSTPROCESS_VENV)" --python 3.12; \
 	fi
 	@uv pip install --python "$(POSTPROCESS_VENV)/bin/python" -r "$(POSTPROCESS_DIR)/requirements/requirements.txt"
+
+## postprocess/src/upload_images.py を軽量venvで実行し、Markdown中のローカル画像をGoogle Driveへ
+## アップロードして直リンクへ書き換える（事前にrcloneが読み書き両対応スコープで認可済みであること）。
+upload-images: postprocess-venv
+	@if [ -z "$(MD)" ]; then echo "MD=<論文名>.mdのパスを指定してください（例: make upload-images MD=output/example/example.md）" >&2; exit 1; fi
+	"$(POSTPROCESS_VENV)/bin/python" "$(POSTPROCESS_DIR)/src/upload_images.py" "$(MD)" $(ARGS)
 
 ## postprocess/src/split_sentences.py を軽量venvで実行する（marker-pdf/PyMuPDF不要）。
 split: postprocess-venv

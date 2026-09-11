@@ -44,9 +44,12 @@ flowchart LR
 - Claude CodeへのGoogle Drive MCPコネクタ（プラグイン）追加
 - GPT Site（論文の原文・翻訳を閲覧するアプリ。本リポジトリの範囲外だが、前処理結果の閲覧側として必要）
 - Postgres互換DB（開発時はNeonを想定）。接続文字列は`config/settings.local.toml`の`[db].connection_string`に設定
-- rclone。事前に`rclone config`でGoogle DriveへのOAuth認可済みリモートを作成しておくこと
-  （`01-01-fetch-pdf`がGoogle Drive上のPDF取得に使用）。リモート名は`config/settings.toml`の`[gdrive].remote`、
-  Drive上のフォルダパスは`config/settings.local.toml`の`[gdrive].pdf_folder`に設定
+- rclone。事前に`rclone config`でGoogle Driveへ読み書き両対応スコープ（`drive`）でOAuth認可済みリモートを
+  作成しておくこと（`01-01-fetch-pdf`のPDF取得、`03-01-upload-images`の画像アップロードに使用。
+  ダウンロード専用スコープでは画像アップロードができない）。リモート名は`config/settings.toml`の`[gdrive].remote`、
+  PDFのDrive上のフォルダパスは`config/settings.local.toml`の`[gdrive].pdf_folder`、
+  画像アップロード先の共有フォルダIDは同ファイルの`[gdrive].images_folder_id`に設定
+  （共有フォルダは「リンクを知っている人は閲覧可」に設定しておくこと）
 - Docker（`preprocess/`のPDF→Markdown抽出〔marker-pdf + PyMuPDF〕用devcontainerイメージビルドに必要。
   `postprocess/`は軽量venv〔uv管理〕のためDocker不要）
 
@@ -57,7 +60,7 @@ flowchart LR
 1. 対象PDFを`pdf/<論文名>.pdf`に配置する（無くてもよい。無ければ`01-01-fetch-pdf`がGoogle Driveから取得する）
 2. Claude Code もしくは Codex に「`pdf/<論文名>.pdf`を処理して」のように指示する
 
-指示を受けたLLMは、[docs/01_workflow.md](docs/01_workflow.md)に定義された`01-01-fetch-pdf`〜`06-01-load-to-db`の
+指示を受けたLLMは、[docs/01_workflow.md](docs/01_workflow.md)に定義された`01-01-fetch-pdf`〜`07-01-load-to-db`の
 Skillを順番に実行し、PDF取得からDB格納まで通しで進める。
 
 ### 4.2 特定の処理だけ切り出したい場合
@@ -66,6 +69,7 @@ Skillを順番に実行し、PDF取得からDB格納まで通しで進める。
 
 ```bash
 make extract PDF=pdf/paper.pdf OUT=output   # PDF→Markdown抽出（Docker経由）
+make upload-images MD=output/paper/paper.md # 画像をGoogle Driveへアップロード・URL書き換え
 make split REVIEW=output/paper/paper_review.md  # レビュー済みMarkdown→CSV
 make db-upgrade                                  # DBスキーマを最新へ（Alembic）
 make load-db CSV=output/paper/paper.csv  # CSV→DB格納
@@ -82,8 +86,8 @@ paper-reader/
 ├── output/<論文名>/       # 論文ごとの中間成果物（Markdown・CSV・表画像）
 ├── preprocess/           # PDF→Markdown抽出。marker-pdf + PyMuPDF、Docker/devcontainer経由で実行
 │   └── src/extract_pdf.py
-├── postprocess/          # 文分割・翻訳補助・DB格納。軽量venv（uv管理）、Docker不要
-│   ├── src/              # split_sentences.py / apply_translations.py / check_translation.py / load_to_db.py / db/
+├── postprocess/          # 画像アップロード・文分割・翻訳補助・DB格納。軽量venv（uv管理）、Docker不要
+│   ├── src/              # upload_images.py / split_sentences.py / apply_translations.py / check_translation.py / load_to_db.py / db/
 │   └── migrations/       # Alembicマイグレーション
 ├── config/               # 接続設定。settings.toml（共有）/ settings.local.toml（秘密情報、gitignore対象）
 ├── docs/                 # ワークフロー・DBスキーマ・CSVスキーマ等のドキュメント
@@ -98,12 +102,12 @@ paper-reader/
 
 | ファイル | 内容 |
 | --- | --- |
-| `<論文名>.md` | PDFからの抽出直後のMarkdown（以降変更しない、差分確認の基準） |
+| `<論文名>.md` | PDFからの抽出直後のMarkdown。画像参照はDrive直リンクへ書き換え済み（以降変更しない、差分確認の基準） |
 | `<論文名>_review.md` | 見出し構造・数式を修正したレビュー済みMarkdown |
-| `<論文名>.csv` | 文単位に分割し、日本語訳を格納した最終CSV（列定義は[docs/02_csv-schema.md](docs/02_csv-schema.md)） |
+| `<論文名>.csv` | 文単位に分割し、日本語訳を格納した最終CSV（画像参照は`type=image`行として保持。列定義は[docs/02_csv-schema.md](docs/02_csv-schema.md)） |
 | `<論文名>_flags.csv` | 文分割レビュー用の自動検出候補（レビュー後は消費済み） |
 | `<論文名>_translation_flags.csv` | 翻訳レビュー用の自動検出候補（レビュー後は消費済み） |
-| `tables/` | PyMuPDFで切り出した表の画像 |
+| `tables/` | PyMuPDFで切り出した表の画像（Google Driveへのアップロード後もローカルには残る） |
 
 ### DB
 

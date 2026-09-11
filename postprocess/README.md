@@ -2,9 +2,22 @@
 
 `preprocess/`（marker-pdf + PyMuPDFによるPDF→Markdown抽出。重い依存・Docker必須）と対になる、軽量な後処理Program格納フォルダ。marker-pdf・PyMuPDF等の重い依存は含まない。
 
+## 画像アップロード・URL書き換え（`upload_images.py`）
+
+`02-01-extract-pdf`完了後の`<論文名>.md`中の画像参照（表・図）をGoogle Driveへアップロードし、ローカル相対パスをDrive直リンクへ書き換える。`03-01-upload-images`が使用。
+
+```bash
+make upload-images MD=output/example/example.md
+```
+
+- リポジトリルートから実行。`rclone`がGoogle Drive宛に読み書き両対応のスコープ（`drive`）でOAuth認可済みであること
+- `config/settings.toml`の`[gdrive].remote`、`config/settings.local.toml`の`[gdrive].images_folder_id`が設定済みであること
+- 同名ファイルへの再アップロードは`rclone`が同一Driveファイルを上書き更新するため、file_id・URLは変わらない（再実行しても安全）
+- `--dry-run`を付けるとDriveへは接続せず、対象件数の確認のみ行う
+
 ## 文章分割・CSV出力（`split_sentences.py`）
 
-`03-01-fix-heading-structure`〜`03-03-spot-check-review` 完了後の `<論文名>_review.md` を文単位に分割し、CSVへ出力。
+`04-01-fix-heading-structure`〜`04-03-spot-check-review` 完了後の `<論文名>_review.md` を文単位に分割し、CSVへ出力。
 
 ```bash
 make split REVIEW=output/example/example_review.md
@@ -22,7 +35,7 @@ make split REVIEW=output/example/example_review.md
 
 ## 翻訳（`apply_translations.py` / `check_translation.py`）
 
-`04-01-split-sentences`〜`04-02-review-split`完了後のCSVに対し、`05-01-translate`（翻訳者）・`05-02-review-translation`（校正者）が使用。
+`05-01-split-sentences`〜`05-02-review-split`完了後のCSVに対し、`06-01-translate`（翻訳者）・`06-02-review-translation`（校正者）が使用。
 
 - `apply_translations.py`: `{"sentence_id": "translated_text", ...}` 形式のJSONをCSVへ安全にマージ（LLMによるCSV直接編集でカンマ・引用符のエスケープが壊れるのを防ぐ、書き戻し専用Program）
 
@@ -38,7 +51,7 @@ make split REVIEW=output/example/example_review.md
 
 ## DB格納（`load_to_db.py` / `db/` / Alembic）
 
-`05-02-review-translation`完了後のCSVを検証し、DB（Postgres互換）へ保存。`06-01-load-to-db`が使用。
+`06-02-review-translation`完了後のCSVを検証し、DB（Postgres互換）へ保存。`07-01-load-to-db`が使用。
 
 - `src/db/models.py`: SQLAlchemy ORMモデル（`Paper`, `Sentence`）。将来の閲覧用アプリからも再利用する想定
 - `src/db/engine.py`: 接続文字列の読み込み・Engine生成
