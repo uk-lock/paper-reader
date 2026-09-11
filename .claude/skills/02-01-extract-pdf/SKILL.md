@@ -6,14 +6,14 @@ description: 対象PDFをmarker-pdf + PyMuPDF経由でMarkdownへ変換する。
 # Skill: PDF抽出（marker-pdf + PyMuPDF）
 
 ## 目的
-対象PDFをMarkdownへ変換する。`preprocess/src/extract_pdf.py` をコンテナ経由で実行し、`03-01-fix-heading-structure` 以降の入力となるMarkdownを生成する。本Skill自体はLLMによる判断を含まない、決定論的な実行のみ。
+対象PDFをMarkdownへ変換する。`preprocess/src/extract_pdf.py` をコンテナ経由で実行し、`03-01-upload-images` 以降の入力となるMarkdownを生成する。本Skill自体はLLMによる判断を含まない、決定論的な実行のみ。
 
 ## 前提
 リポジトリルートの `Makefile` の `make extract` ターゲットで、ビルド・実行・コンテナクリーンアップまで1コマンドで完結。
 
 ## 入出力
 - 入力: 対象PDF（`pdf/` 配下）
-- 出力: `<OUT>/<論文名>/<論文名>.md`、および同ディレクトリ内の `tables/` フォルダ（表画像）
+- 出力: `<OUT>/<論文名>/<論文名>.md`、`tables/` フォルダ（表画像）、および同ディレクトリ直下の図画像（`_page_<N>_Figure_<M>.jpeg`等。marker-pdfが直接生成）
 
 ## 手順
 1. リポジトリルートで以下を実行する。
@@ -36,4 +36,4 @@ description: 対象PDFをmarker-pdf + PyMuPDF経由でMarkdownへ変換する。
 手順3・4の確認が全て取れた時点で完了。生成された `<論文名>.md` のパスと、Table検出数を作業ログとして報告する。
 
 ## 次のSkill
-`03-01-fix-heading-structure` を実行する。
+`03-01-upload-images` を実行する。

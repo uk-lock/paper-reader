@@ -116,7 +116,7 @@ def fix_footnotes(markdown_text: str) -> str:
 
 
 REFERENCES_HEADING_RE = re.compile(r"^#+\s+References[ \t]*$", re.MULTILINE)
-# 本処理は03_01_fix_heading_structure.md（見出しレベルの整備）より前の生の抽出結果に対して
+# 本処理は04_01_fix_heading_structure.md（見出しレベルの整備）より前の生の抽出結果に対して
 # 実行されるため、見出しレベルはまだ崩れている可能性がある（例: Referencesが誤ってH1、
 # 次章がH4等）。そのため「次に見出しが来るまで」をH2限定にせず、レベル不問で判定する。
 NEXT_HEADING_RE = re.compile(r"^#+\s", re.MULTILINE)

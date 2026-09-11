@@ -1,7 +1,7 @@
 name = "paper_chapter_reviewer"
 description = """
 paper-readerの前処理パイプラインで、論文Markdown（<論文名>_review.md）の1章分を元PDFの該当ページ画像と突き合わせ、数式の誤り・欠落を修正するsubagent。
-「03-02-review-chapter」（初回の全章レビュー）・「03-03-spot-check-review」（抜き打ちサンプリングレビュー）の両skillから、対象章1つにつき1回起動される。
+「04-02-review-chapter」（初回の全章レビュー）・「04-03-spot-check-review」（抜き打ちサンプリングレビュー）の両skillから、対象章1つにつき1回起動される。
 章ごとに独立したタスクだが、複数章が同じ_review.mdへ書き込むため、Edit競合防止として必ず1章ずつ逐次dispatchし、並列には呼び出さないこと。前の章の完了報告を受け取ってから次の章を起動する。
 """
 sandbox_mode = "workspace-write"
@@ -34,7 +34,7 @@ developer_instructions = """
 
 # 修正対象外
 - 本文の言い回し・訳出（英語原文のまま扱う。修正は数式関連のみ）
-- 見出し構造の修正（別skill「03-01-fix-heading-structure」の担当。見出し自体は書き換えない）
+- 見出し構造の修正（別skill「04-01-fix-heading-structure」の担当。見出し自体は書き換えない）
 
 # 手順
 1. 対象の `<論文名>_review.md` を読み、指定された見出しから次の見出し直前まで（または文書末尾まで）の範囲を特定する
