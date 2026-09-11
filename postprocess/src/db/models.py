@@ -24,6 +24,9 @@ class Paper(Base):
     file_name: Mapped[str | None] = mapped_column(Text)
     title: Mapped[str | None] = mapped_column(Text)
     processing_status: Mapped[str | None] = mapped_column(Text)
+    # Google Drive上の元PDFのファイルID（Drive APIの一意識別子。パスと違いリネーム・移動でも不変）。
+    # ローカルにのみ存在しDrive検索で見つからなかった場合はnull（01-01-fetch-pdf参照）。
+    drive_file_id: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime.datetime] = mapped_column(server_default=func.now(), nullable=False)
 
     sentences: Mapped[list[Sentence]] = relationship(

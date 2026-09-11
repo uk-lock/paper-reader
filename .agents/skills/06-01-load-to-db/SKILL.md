@@ -15,6 +15,7 @@ description: 05-02-review-translation完了後のCSVを検証しDB（Postgres互
 
 ## 入出力
 - 入力: `<OUT>/<論文名>/<論文名>.csv`
+- 入力（任意）: `pdf/<file_name>.drive_id`（`01-01-fetch-pdf`が作成するサイドカーファイル）。存在すればその内容を`papers.drive_file_id`へ保存し、無ければ`drive_file_id`はnullになる
 - 出力: DBの`papers`テーブル・`sentences`テーブル（スキーマは`postprocess/src/db/models.py`で定義）
 
 ## 手順
@@ -57,7 +58,7 @@ make db-upgrade
 
 ## スキーマ
 ```sql
-papers(paper_id PK, file_name, title, processing_status, created_at)
+papers(paper_id PK, file_name, drive_file_id, title, processing_status, created_at)
 sentences(sentence_id PK, paper_id FK, sentence_order, page_number, type, heading_level, original_text, translated_text)
 ```
 `sentences.sentence_order`はCSVの`order`列に対応する（`order`はSQL予約語のため列名を変えている）。`paper_id`+`sentence_order`にユニーク制約。
@@ -71,7 +72,7 @@ sentences(sentence_id PK, paper_id FK, sentence_order, page_number, type, headin
 - 接続エラーの場合、`config/settings.local.toml`の`[db].connection_string`を確認する
 
 ## 完了条件・報告
-手順2・3の確認が取れた時点で完了。保存した`paper_id`・タイトル・保存件数を作業ログとして報告する。
+手順2・3の確認が取れた時点で完了。保存した`paper_id`・タイトル・保存件数に加え、`drive_file_id`を保存できたかどうかを作業ログとして報告する。
 
 ## 次のSkill
 なし（パイプライン完了）。
