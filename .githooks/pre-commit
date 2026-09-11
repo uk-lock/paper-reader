@@ -1,0 +1,21 @@
+#!/bin/sh
+# gitleaksでステージ済み変更をスキャンし、ruffでPythonのlint/format崩れをチェックする。
+# 有効化: git config core.hooksPath .githooks
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "warning: gitleaks が見つかりません。brew install gitleaks でインストールしてください（今回はスキップします）" >&2
+else
+  gitleaks protect --staged --redact -v || exit 1
+fi
+
+if git diff --cached --name-only --diff-filter=ACM | grep -q '\.py$'; then
+  if ! command -v uvx >/dev/null 2>&1; then
+    echo "warning: uvx が見つかりません（https://docs.astral.sh/uv/ を参照）。ruffのチェックをスキップします" >&2
+  else
+    repo_root="$(git rev-parse --show-toplevel)"
+    if ! (cd "$repo_root" && make format-check); then
+      echo "error: ruffのチェックに失敗しました。'make format' で自動整形してから再度コミットしてください" >&2
+      exit 1
+    fi
+  fi
+fi

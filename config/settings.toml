@@ -1,0 +1,6 @@
+[gdrive]
+remote = "gdrive"
+
+[db]
+papers_table = "papers"
+sentences_table = "sentences"

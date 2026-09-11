@@ -1,0 +1,12 @@
+title = "youtube-summary gitleaks config"
+
+[extend]
+# デフォルトルールセットをベースに使う
+useDefault = true
+
+[allowlist]
+paths = [
+  '''venv/''',
+  '''\.mypy_cache/''',
+  '''__pycache__/''',
+]

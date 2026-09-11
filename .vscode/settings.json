@@ -1,0 +1,12 @@
+{
+  // Python: ruff拡張（charliermarsh.ruff）で保存時に自動整形・自動修正する。
+  // 設定内容自体はリポジトリ直下のpyproject.toml（[tool.ruff]）を参照するため、ここには重複させない。
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit",
+      "source.organizeImports.ruff": "explicit"
+    }
+  }
+}

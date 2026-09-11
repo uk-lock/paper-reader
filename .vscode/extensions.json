@@ -1,0 +1,6 @@
+{
+  // このリポジトリを開いた時にVS Codeが自動でインストールを提案する拡張機能。
+  "recommendations": [
+    "charliermarsh.ruff"
+  ]
+}

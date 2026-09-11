@@ -1,0 +1,18 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+# preprocess/postprocess それぞれの .venv や検証用ノートブックは対象外
+extend-exclude = [
+  "preprocess/src/jupyter",
+]
+
+[tool.ruff.lint]
+# E4/E7/E9 + F は ruff のデフォルト（pycodestyleのバグ検出系 + pyflakes）。
+# I: import並び替え, UP: 古い書き方の検出, B: バグになりやすい書き方の検出, SIM: 冗長な書き方の簡略化。
+# E501(行長超過)はコメント・docstringの日本語が長くなりがちなため意図的に含めない。
+select = ["E4", "E7", "E9", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.format]
+quote-style = "double"
+line-ending = "lf"

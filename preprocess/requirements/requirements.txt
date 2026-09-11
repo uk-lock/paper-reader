@@ -1,0 +1,2 @@
+marker-pdf==2.0.0
+pymupdf==1.26.5

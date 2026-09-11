@@ -1,0 +1,42 @@
+{
+  "name": "paper-reader",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "../.."
+  },
+  "workspaceMount": "source=${localWorkspaceFolder}/..,target=/workspaces/paper-reader,type=bind,consistency=cached",
+  "workspaceFolder": "/workspaces/paper-reader",
+  "remoteUser": "vscode",
+  "containerEnv": {
+    "TORCH_DEVICE": "cpu",
+    "FONT_PATH": "/home/vscode/.cache/marker/fonts/GoNotoCurrent-Regular.ttf",
+    "PYTHONUNBUFFERED": "1"
+  },
+  "mounts": [
+    "source=paper-reader-model-cache,target=/home/vscode/.cache,type=volume"
+  ],
+  "runArgs": [
+    "--shm-size=2g"
+  ],
+  "forwardPorts": [
+    8888
+  ],
+  "portsAttributes": {
+    "8888": {
+      "label": "JupyterLab",
+      "onAutoForward": "notify"
+    }
+  },
+  "postCreateCommand": "python -m ipykernel install --user --name paper-reader-env --display-name paper-reader-env",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-toolsai.jupyter"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python"
+      }
+    }
+  }
+}
