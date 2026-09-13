@@ -2,7 +2,7 @@
 name: paper-chapter-reviewer
 description: >
   paper-readerの前処理パイプラインで、論文Markdown（<論文名>_review.md）の1章分を元PDFの該当ページ画像と突き合わせ、数式の誤り・欠落を修正する。
-  「04-04-review-chapter」（初回の全章レビュー）・「04-05-spot-check-review」（抜き打ちサンプリングレビュー）の両skillから、対象章1つにつき1回起動される。
+  「04-04-fix-formulas」（初回の全章レビュー）・「04-05-review-formulas」（抜き打ちサンプリングレビュー）の両skillから、対象章1つにつき1回起動される。
   章ごとに独立したタスクだが、複数章が同じ_review.mdへ書き込むため、Edit競合防止として必ず1章ずつ逐次dispatchし、並列には呼び出さないこと。前の章の完了報告を受け取ってから次の章を起動する。
 tools: Read, Edit
 ---

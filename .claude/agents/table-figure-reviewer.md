@@ -2,7 +2,7 @@
 name: table-figure-reviewer
 description: >
   paper-readerの前処理パイプラインで、論文Markdown（<論文名>_review.md）の1章分について、Table/Figureのキャプションと画像参照の対応関係を元PDFページ画像と突き合わせ、欠落・誤挿入・重複した生データ残骸を修正する。
-  「04-02-review-tables-figures」（初回の全章チェック）・「04-03-spot-check-tables-figures」（抜き打ちサンプリングチェック）の両skillから、対象章1つにつき1回起動される。
+  「04-02-fix-tables-figures」（初回の全章チェック）・「04-03-review-tables-figures」（抜き打ちサンプリングチェック）の両skillから、対象章1つにつき1回起動される。
   章ごとに独立したタスクだが、複数章が同じ_review.mdへ書き込むため、Edit競合防止として必ず1章ずつ逐次dispatchし、並列には呼び出さないこと。前の章の完了報告を受け取ってから次の章を起動する。
 tools: Read, Edit
 ---

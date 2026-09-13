@@ -1,15 +1,15 @@
 ---
-name: 04-03-spot-check-tables-figures
-description: 04-02-review-tables-figuresの全章実行完了後、コスト抑制のため全章の再チェックは行わず抜き打ちで修正品質を検証する。全章のチェックが終わったタイミングで1回だけ使う。
+name: 04-03-review-tables-figures
+description: 04-02-fix-tables-figuresの全章実行完了後、コスト抑制のため全章の再チェックは行わず抜き打ちで修正品質を検証する。全章のチェックが終わったタイミングで1回だけ使う。
 ---
 
 # Skill: 抜き打ちサンプリングチェック（Table/Figure）
 
 ## 目的
-`04-02-review-tables-figures` の全章実行完了後、その修正品質を抜き打ちで検証する。全章の再チェックは行わない（コスト抑制のため）。
+`04-02-fix-tables-figures` の全章実行完了後、その修正品質を抜き打ちで検証する。全章の再チェックは行わない（コスト抑制のため）。
 
 ## 実行タイミング
-全章（最上位章）の `04-02-review-tables-figures` が完了した後、1回のみ実行する。
+全章（最上位章）の `04-02-fix-tables-figures` が完了した後、1回のみ実行する。
 
 ## 対象ファイル
 `<論文名>_review.md`（元Markdownは対象外）。
@@ -19,14 +19,14 @@ description: 04-02-review-tables-figuresの全章実行完了後、コスト抑�
 2. 上位から「全章数の30%（端数切り上げ、最低1章）」を対象として選定する
 
 ## 実行方法
-選定した各章について、Agentツールで `table-figure-reviewer` subagentを起動する（`subagent_type: "table-figure-reviewer"`）。`04-02-review-tables-figures`での修正結果を前提にさせず、PDFと元から突き合わせ直させる。複数章が同じ`<論文名>_review.md`へ書き込むため、必ず `run_in_background: false` で1章ずつ逐次dispatchし、並列には呼び出さない。呼び出し時に渡す情報は `04-02-review-tables-figures` と同じ（対象`_review.md`の絶対パス、対象章の見出し範囲、元PDFのページ範囲、対象章のページ範囲に該当する候補画像ファイル名一覧）。
+選定した各章について、Agentツールで `table-figure-reviewer` subagentを起動する（`subagent_type: "table-figure-reviewer"`）。`04-02-fix-tables-figures`での修正結果を前提にさせず、PDFと元から突き合わせ直させる。複数章が同じ`<論文名>_review.md`へ書き込むため、必ず `run_in_background: false` で1章ずつ逐次dispatchし、並列には呼び出さない。呼び出し時に渡す情報は `04-02-fix-tables-figures` と同じ（対象`_review.md`の絶対パス、対象章の見出し範囲、元PDFのページ範囲、対象章のページ範囲に該当する候補画像ファイル名一覧）。
 
 ## 判定・エスカレーション
 - 対象章で誤りが1件も見つからない場合: サンプリングチェックを完了とする
 - 対象章で誤りが見つかった場合:
   1. 発見した誤りはsubagentがその場で修正済み
   2. サンプリング対象外だった章から、追加で「全章数の30%」を選定し、同じ手順を再実行する
-  3. 追加分でも誤りが見つかった場合、全章を対象に `04-02-review-tables-figures` を再実行する
+  3. 追加分でも誤りが見つかった場合、全章を対象に `04-02-fix-tables-figures` を再実行する
 
 ## 完了条件・報告
 以下を作業ログとして報告する。
@@ -37,4 +37,4 @@ description: 04-02-review-tables-figuresの全章実行完了後、コスト抑�
 完了条件を満たしていれば確認を挟まず次のSkillへ進む。満たしていない場合は本Skill内の該当手順（またはエラー時の対応）からやり直す。完了条件は満たしているが判断に迷う点・懸念がある場合のみ、その旨を添えて人間に相談する。
 
 ## 次のSkill
-`04-04-review-chapter` を1回実行する。
+`04-04-fix-formulas` を1回実行する。

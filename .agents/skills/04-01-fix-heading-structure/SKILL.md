@@ -48,4 +48,4 @@ description: 抽出Markdownの見出し（#の数・親子関係）を元PDFの�
 完了条件を満たしていれば確認を挟まず次のSkillへ進む。満たしていない場合は本Skill内の該当手順（またはエラー時の対応）からやり直す。完了条件は満たしているが判断に迷う点・懸念がある場合のみ、その旨を添えて人間またはCodex/Claude Codeに相談する。
 
 ## 次のSkill
-`04-02-review-tables-figures` を、章ごとに繰り返し実行する。
+`04-02-fix-tables-figures` を、章ごとに繰り返し実行する。

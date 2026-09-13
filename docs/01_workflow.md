@@ -20,11 +20,11 @@ flowchart LR
         S1["01-01-fetch-pdf<br/>PDFの準備"]:::llm --> S2["02-01-extract-pdf<br/>PDF→Markdown抽出"]:::prog
         S2 --> S3["03-01-upload-images<br/>画像アップロード・URL書き換え"]:::prog
         S3 --> S4["04-01-fix-heading-structure<br/>見出し構造の修正"]:::llm
-        S4 --> S4a["04-02-review-tables-figures<br/>Table/Figure画像配置の修正"]:::llm
-        S4a --> S4b["04-03-spot-check-tables-figures<br/>抜き打ちサンプリングチェック"]:::llm
+        S4 --> S4a["04-02-fix-tables-figures<br/>Table/Figure画像配置の修正"]:::llm
+        S4a --> S4b["04-03-review-tables-figures<br/>抜き打ちサンプリングチェック"]:::llm
         S4b -- 誤りを検出 --> S4a
-        S4b --> S5["04-04-review-chapter<br/>章ごとの数式レビュー"]:::llm
-        S5 --> S6["04-05-spot-check-review<br/>抜き打ちサンプリングレビュー"]:::llm
+        S4b --> S5["04-04-fix-formulas<br/>章ごとの数式レビュー"]:::llm
+        S5 --> S6["04-05-review-formulas<br/>抜き打ちサンプリングレビュー"]:::llm
         S6 -- 誤りを検出 --> S5
         S6 --> S7["05-01-split-sentences<br/>文章分割・CSV出力"]:::prog
         S7 --> S8["05-02-review-split<br/>文分割結果のレビュー"]:::llm
@@ -82,10 +82,10 @@ flowchart LR
 <tr><td>2</td><td>PDF→Markdown抽出</td><td>PDFのMarkdown変換(marker-pdf + PyMuPDF)</td><td><a href="../.claude/skills/02-01-extract-pdf/SKILL.md">02-01-extract-pdf</a></td><td>Program(<code>make extract</code>)</td><td><code>pdf/&lt;論文名&gt;.pdf</code></td><td><code>output/&lt;論文名&gt;/&lt;論文名&gt;.md</code>、<code>tables/</code>(表画像)、図画像</td></tr>
 <tr><td>3</td><td>画像のアップロード・URL書き換え</td><td>抽出画像(表・図)のGoogle Driveへのアップロードと、Markdown内画像参照のDrive直リンクへの書き換え</td><td><a href="../.claude/skills/03-01-upload-images/SKILL.md">03-01-upload-images</a></td><td>Program(<code>make upload-images</code>)</td><td><code>&lt;論文名&gt;.md</code>(ローカル画像参照込み)</td><td><code>&lt;論文名&gt;.md</code>(画像参照をDrive URLへ書き換え)、Google Drive共有フォルダ直下<code>&lt;論文名&gt;/</code></td></tr>
 <tr><td>4</td><td rowspan="5">Markdownの見出し構造・数式の精度担保</td><td>見出し(<code>#</code>の数・親子関係)の元PDF章立てとの一致</td><td><a href="../.claude/skills/04-01-fix-heading-structure/SKILL.md">04-01-fix-heading-structure</a></td><td>LLM</td><td><code>&lt;論文名&gt;.md</code></td><td><code>&lt;論文名&gt;_review.md</code>(新規作成。以降はこれを編集)</td></tr>
-<tr><td>5</td><td>Table/Figureキャプションと画像参照の対応関係修正（欠落・誤挿入・重複した生データ残骸の除去）</td><td><a href="../.claude/skills/04-02-review-tables-figures/SKILL.md">04-02-review-tables-figures</a></td><td>LLM</td><td><code>&lt;論文名&gt;_review.md</code>、元PDF</td><td><code>&lt;論文名&gt;_review.md</code>(Table/Figure対応関係の修正)</td></tr>
-<tr><td>6</td><td>全章完了後の抜き打ちサンプリングによるTable/Figure対応関係の修正品質検証</td><td><a href="../.claude/skills/04-03-spot-check-tables-figures/SKILL.md">04-03-spot-check-tables-figures</a></td><td>LLM</td><td><code>&lt;論文名&gt;_review.md</code></td><td>同上(誤り検出時は5へ差し戻し)</td></tr>
-<tr><td>7</td><td>章ごとの元PDF該当ページとの突き合わせによる数式修正</td><td><a href="../.claude/skills/04-04-review-chapter/SKILL.md">04-04-review-chapter</a></td><td>LLM</td><td><code>&lt;論文名&gt;_review.md</code>、元PDF</td><td><code>&lt;論文名&gt;_review.md</code>(数式修正)</td></tr>
-<tr><td>8</td><td>全章完了後の抜き打ちサンプリングによる修正品質検証</td><td><a href="../.claude/skills/04-05-spot-check-review/SKILL.md">04-05-spot-check-review</a></td><td>LLM</td><td><code>&lt;論文名&gt;_review.md</code></td><td>同上(誤り検出時は7へ差し戻し)</td></tr>
+<tr><td>5</td><td>Table/Figureキャプションと画像参照の対応関係修正（欠落・誤挿入・重複した生データ残骸の除去）</td><td><a href="../.claude/skills/04-02-fix-tables-figures/SKILL.md">04-02-fix-tables-figures</a></td><td>LLM</td><td><code>&lt;論文名&gt;_review.md</code>、元PDF</td><td><code>&lt;論文名&gt;_review.md</code>(Table/Figure対応関係の修正)</td></tr>
+<tr><td>6</td><td>全章完了後の抜き打ちサンプリングによるTable/Figure対応関係の修正品質検証</td><td><a href="../.claude/skills/04-03-review-tables-figures/SKILL.md">04-03-review-tables-figures</a></td><td>LLM</td><td><code>&lt;論文名&gt;_review.md</code></td><td>同上(誤り検出時は5へ差し戻し)</td></tr>
+<tr><td>7</td><td>章ごとの元PDF該当ページとの突き合わせによる数式修正</td><td><a href="../.claude/skills/04-04-fix-formulas/SKILL.md">04-04-fix-formulas</a></td><td>LLM</td><td><code>&lt;論文名&gt;_review.md</code>、元PDF</td><td><code>&lt;論文名&gt;_review.md</code>(数式修正)</td></tr>
+<tr><td>8</td><td>全章完了後の抜き打ちサンプリングによる修正品質検証</td><td><a href="../.claude/skills/04-05-review-formulas/SKILL.md">04-05-review-formulas</a></td><td>LLM</td><td><code>&lt;論文名&gt;_review.md</code></td><td>同上(誤り検出時は7へ差し戻し)</td></tr>
 <tr><td>9</td><td rowspan="2">文単位のCSV分割・精度担保</td><td>レビュー済みMarkdownの文単位分割・CSV出力(自動検出フラグも生成)</td><td><a href="../.claude/skills/05-01-split-sentences/SKILL.md">05-01-split-sentences</a></td><td>Program(<code>make split</code>)</td><td><code>&lt;論文名&gt;_review.md</code></td><td><code>&lt;論文名&gt;.csv</code>、<code>&lt;論文名&gt;_flags.csv</code></td></tr>
 <tr><td>10</td><td>自動検出フラグ行の<code>_review.md</code>との突き合わせによるCSV修正</td><td><a href="../.claude/skills/05-02-review-split/SKILL.md">05-02-review-split</a></td><td>LLM</td><td><code>&lt;論文名&gt;_flags.csv</code>、<code>&lt;論文名&gt;_review.md</code></td><td><code>&lt;論文名&gt;.csv</code>(分割誤りの修正)</td></tr>
 <tr><td>11</td><td rowspan="2">日本語への翻訳・精度担保</td><td>見出しノード単位での<code>original_text</code>翻訳・<code>translated_text</code>列への格納</td><td><a href="../.claude/skills/06-01-translate/SKILL.md">06-01-translate</a></td><td>LLM</td><td><code>&lt;論文名&gt;.csv</code></td><td><code>&lt;論文名&gt;.csv</code>(<code>translated_text</code>列。<code>apply_translations.py</code>経由で書き戻し)</td></tr>

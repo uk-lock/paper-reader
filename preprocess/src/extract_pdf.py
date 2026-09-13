@@ -406,7 +406,7 @@ def replace_tables_with_images(
     本文から欠落したり地の文に混入したりすることがあり、この場合は件数が食い違う。
     どのブロックがどの画像に対応するかを機械的に決め打ちすると誤った画像を挿入しかねない
     ため、件数が一致しない場合は自動置換を行わない（安全側に倒す）。対応付けは後続のLLM
-    レビュー工程（`04-02-review-tables-figures`）に委ねる。
+    レビュー工程（`04-02-fix-tables-figures`）に委ねる。
     """
     lines = markdown_text.split("\n")
     blocks = find_real_table_blocks(lines)
@@ -417,7 +417,7 @@ def replace_tables_with_images(
             f"切り出した画像({len(image_names)}件)の数が一致しないため、"
             "誤挿入を避けて画像の自動挿入をスキップしました。"
             f" 切り出し済み画像: {', '.join(image_names) if image_names else 'なし'}"
-            "（04-02-review-tables-figuresで対応付けてください）。",
+            "（04-02-fix-tables-figuresで対応付けてください）。",
             file=sys.stderr,
         )
         return markdown_text

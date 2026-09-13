@@ -1,12 +1,12 @@
 ---
-name: 04-04-review-chapter
-description: 指定された1章分のMarkdownを元PDFの該当ページと突き合わせ、数式の誤り・欠落を修正する。04-03-spot-check-tables-figures完了後、対象文書の最上位章の数だけ章を変えて繰り返し実行する。
+name: 04-04-fix-formulas
+description: 指定された1章分のMarkdownを元PDFの該当ページと突き合わせ、数式の誤り・欠落を修正する。04-03-review-tables-figures完了後、対象文書の最上位章の数だけ章を変えて繰り返し実行する。
 ---
 
 # Skill: 章ごとの数式レビュー
 
 ## 目的
-`04-03-spot-check-tables-figures` 完了後、対象文書の最上位章（H2見出し）ごとに `paper-chapter-reviewer` subagentへ数式レビューを委譲する。章を変えて、最上位章の数だけ繰り返し実行する。
+`04-03-review-tables-figures` 完了後、対象文書の最上位章（H2見出し）ごとに `paper-chapter-reviewer` subagentへ数式レビューを委譲する。章を変えて、最上位章の数だけ繰り返し実行する。
 
 ## 対象範囲の決め方
 - 基本単位: 最上位章（H2見出し）1つを1回のsubagent呼び出し対象とする
@@ -29,7 +29,7 @@ Agentツールで `paper-chapter-reviewer` subagentを章ごとに起動する�
 完了条件を満たしていれば確認を挟まず次のSkillへ進む。満たしていない場合は本Skill内の該当手順（またはエラー時の対応）からやり直す。完了条件は満たしているが判断に迷う点・懸念がある場合のみ、その旨を添えて人間に相談する。
 
 ## 後工程でのミス発覚時の手戻り
-`04-05-spot-check-review` やそれ以降の工程（`05-01-split-sentences` 等）で、本来本Skillが検出・修正すべきだった誤りが見つかった場合、呼び出し元がその場・その工程の外で直接 `_review.md` を編集して済ませてはならない。該当章（誤りが文書全体に及ぶ場合は全章）を対象に本Skillを再実行し、`paper-chapter-reviewer` へ発見した誤りの内容（症状・該当箇所）を明示的に伝えた上で、通常の突き合わせ・修正・自己レビュー手順をやり直す。
+`04-05-review-formulas` やそれ以降の工程（`05-01-split-sentences` 等）で、本来本Skillが検出・修正すべきだった誤りが見つかった場合、呼び出し元がその場・その工程の外で直接 `_review.md` を編集して済ませてはならない。該当章（誤りが文書全体に及ぶ場合は全章）を対象に本Skillを再実行し、`paper-chapter-reviewer` へ発見した誤りの内容（症状・該当箇所）を明示的に伝えた上で、通常の突き合わせ・修正・自己レビュー手順をやり直す。
 
 ## 次のSkill
-全章の実行完了後、`04-05-spot-check-review` を1回実行する。
+全章の実行完了後、`04-05-review-formulas` を1回実行する。

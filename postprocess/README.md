@@ -17,7 +17,7 @@ make upload-images MD=output/example/example.md
 
 ## 文章分割・CSV出力（`split_sentences.py`）
 
-`04-01-fix-heading-structure`〜`04-05-spot-check-review` 完了後の `<論文名>_review.md` を文単位に分割し、CSVへ出力。
+`04-01-fix-heading-structure`〜`04-05-review-formulas` 完了後の `<論文名>_review.md` を文単位に分割し、CSVへ出力。
 
 ```bash
 make split REVIEW=output/example/example_review.md

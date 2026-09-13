@@ -1,5 +1,5 @@
 ---
-name: 04-02-review-tables-figures
+name: 04-02-fix-tables-figures
 description: 指定された1章分のMarkdownを元PDFの該当ページと突き合わせ、Table/Figureキャプションと画像参照の対応関係（欠落・誤挿入・重複した生データ残骸）を修正する。04-01-fix-heading-structure完了後、対象文書の最上位章の数だけ章を変えて繰り返し実行する。
 ---
 
@@ -50,7 +50,7 @@ description: 指定された1章分のMarkdownを元PDFの該当ページと突�
 完了条件を満たしていれば確認を挟まず次のSkillへ進む。満たしていない場合は本Skill内の該当手順（またはエラー時の対応）からやり直す。完了条件は満たしているが判断に迷う点・懸念がある場合のみ、その旨を添えて人間またはCodex/Claude Codeに相談する。
 
 ## 後工程でのミス発覚時の手戻り
-`04-03-spot-check-tables-figures` やそれ以降の工程（`04-04-review-chapter` 等）で、本来本Skillが検出・修正すべきだった誤りが見つかった場合、呼び出し元がその場・その工程の外で直接 `_review.md` を編集して済ませてはならない。該当章（誤りが文書全体に及ぶ場合は全章）を対象に本Skillを再実行し、`table-figure-reviewer` へ発見した誤りの内容（症状・該当箇所）を明示的に伝えた上で、通常の突き合わせ・修正・自己レビュー手順をやり直す。
+`04-03-review-tables-figures` やそれ以降の工程（`04-04-fix-formulas` 等）で、本来本Skillが検出・修正すべきだった誤りが見つかった場合、呼び出し元がその場・その工程の外で直接 `_review.md` を編集して済ませてはならない。該当章（誤りが文書全体に及ぶ場合は全章）を対象に本Skillを再実行し、`table-figure-reviewer` へ発見した誤りの内容（症状・該当箇所）を明示的に伝えた上で、通常の突き合わせ・修正・自己レビュー手順をやり直す。
 
 ## 次のSkill
-全章の実行完了後、`04-03-spot-check-tables-figures` を1回実行する。
+全章の実行完了後、`04-03-review-tables-figures` を1回実行する。
