@@ -65,5 +65,7 @@ CSV（`<論文名>.csv`）の`original_text`・`order`・`sentence_id`・`type`�
 ## 完了条件・報告
 全見出しノード（Referencesを除く）の翻訳が完了し、手順3のチェックを実行した時点で完了。翻訳したノード数・行数と、`<論文名>_translation_flags.csv`のフラグ件数を作業ログとして報告する。
 
+完了条件を満たしていれば確認を挟まず次のSkillへ進む。満たしていない場合は本Skill内の該当手順（またはエラー時の対応）からやり直す。完了条件は満たしているが判断に迷う点・懸念がある場合のみ、その旨を添えて人間またはCodex/Claude Codeに相談する。
+
 ## 次のSkill
 `06-02-review-translation` を1回実行する。

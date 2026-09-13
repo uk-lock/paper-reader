@@ -65,5 +65,7 @@ postprocess/.venv/bin/python postprocess/src/check_translation.py output/<論文
 - 用語統一のために修正した用語の一覧（あれば）
 - 訳文の自然さ改善のために修正した件数（あれば）
 
+完了条件を満たしていれば確認を挟まず次のSkillへ進む。満たしていない場合は本Skill内の該当手順（またはエラー時の対応）からやり直す。完了条件は満たしているが判断に迷う点・懸念がある場合のみ、その旨を添えて人間またはCodex/Claude Codeに相談する。
+
 ## 次のSkill
 `07-01-load-to-db` を1回実行する。

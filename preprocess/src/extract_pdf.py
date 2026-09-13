@@ -18,6 +18,12 @@ r"""PDFをMarkdownへ変換するProgram（marker-pdf + PyMuPDF ハイブリッ�
 - 引用番号リンクのエスケープ済み角括弧（`\[N\]`）は、LaTeX形式のディスプレイ数式区切り
   （`\[ ... \]`）と衝突し、数式対応Markdownプレビューで表示が崩れるため、HTMLエンティティ
   （`&#91;` / `&#93;`）に置き換える（`fix_citation_bracket_escapes`）
+- 著者名＋年スタイルの引用リンクのエスケープ済み丸括弧（`\(...\)`）も同様に、LaTeXの
+  インライン数式区切り（`\( ... \)`）と衝突してParseErrorの原因になるため、HTMLエンティティ
+  （`&#40;` / `&#41;`）に置き換える（`fix_citation_paren_escapes`）
+- LaTeXの`sidewaystable`等でPDF内容自体が90度回転して組版された表は、切り出したテーブル
+  画像も回転したまま保存されてしまうため、テキスト方向（`dir`）から回転を検出し正立させて
+  保存する（`detect_table_rotation` / `crop_table_images`）
 
 使い方:
     python preprocess/src/extract_pdf.py pdf/example.pdf --output-dir output
@@ -26,6 +32,7 @@ r"""PDFをMarkdownへ変換するProgram（marker-pdf + PyMuPDF ハイブリッ�
 from __future__ import annotations
 
 import argparse
+import io
 import re
 import sys
 import time
@@ -37,6 +44,7 @@ from marker.converters.pdf import PdfConverter
 from marker.models import create_model_dict
 from marker.output import save_output, text_from_rendered
 from marker.schema import BlockTypes
+from PIL import Image
 
 # 数式の中央揃え表示（パイプテーブル記法で出力される）と実テーブルを区別する条件。
 # 実テーブルはヘッダー+区切り行の後に本文データ行が1行以上あり、列数も多い。
@@ -259,6 +267,22 @@ def fix_citation_bracket_escapes(markdown_text: str) -> str:
     return markdown_text.replace("\\[", "&#91;").replace("\\]", "&#93;")
 
 
+def fix_citation_paren_escapes(markdown_text: str) -> str:
+    r"""引用リンクのエスケープ済み丸括弧（`\(`/`\)`）をHTMLエンティティに置き換える。
+
+    marker-pdfは著者名＋年スタイルの引用リンクのテキスト中の丸括弧を`\(`/`\)`で
+    エスケープして出力するが、この2文字の並びはLaTeXのインライン数式区切り
+    （`\( ... \)`、`$...$`と同義）としても解釈されるため、数式対応のMarkdown
+    プレビュー（KaTeX/MathJax系）でParseErrorが多発する。しかも開き`\(`と閉じ`\)`が
+    別々のMarkdownリンクに分かれて出現するため、複数の引用をまたいだ広い範囲を
+    数式として解釈しようとしてほぼ確実に構文エラーになる。HTMLエンティティ
+    （`&#40;` / `&#41;`）に置き換えれば、Markdownリンクの丸括弧としては引き続き
+    正しく機能しつつ、数式区切り記号との衝突を避けられる（`fix_citation_bracket_escapes`
+    の丸括弧版）。
+    """
+    return markdown_text.replace("\\(", "&#40;").replace("\\)", "&#41;")
+
+
 def build_converter(output_dir: Path) -> tuple[PdfConverter, ConfigParser]:
     config_parser = ConfigParser(
         {
@@ -290,6 +314,24 @@ def collect_table_regions(document) -> list[tuple[int, tuple[float, float, float
     return regions
 
 
+def detect_table_rotation(page, clip) -> int:
+    """クロップ領域内のテキスト方向から、正立させるための回転角度（度）を返す。
+
+    ページ自体の`/Rotate`属性とは無関係に、LaTeXの`sidewaystable`等で内容そのものが
+    90度回転して描画されている表がある。`page.get_text("dict", clip=...)`の各text
+    spanの`dir`（文字の進行方向。横書きなら`(1, 0)`）を見て、横書き以外なら正立に
+    必要な回転角度を返す（横書き、またはテキストが取得できない場合は0）。
+    """
+    for block in page.get_text("dict", clip=clip).get("blocks", []):
+        for line in block.get("lines", []):
+            dx, dy = line.get("dir", (1.0, 0.0))
+            if dy > 0.5:
+                return 90
+            if dy < -0.5:
+                return -90
+    return 0
+
+
 def crop_table_images(
     pdf_path: Path,
     table_regions: list[tuple[int, tuple[float, float, float, float]]],
@@ -297,7 +339,11 @@ def crop_table_images(
     dpi: int,
     pad: float,
 ) -> list[str]:
-    """各Table領域を元PDFから画像として切り出し、保存したファイル名のリストを返す。"""
+    """各Table領域を元PDFから画像として切り出し、保存したファイル名のリストを返す。
+
+    内容が90度回転して組版された表（`detect_table_rotation`が検出）は、切り出し後に
+    正立するよう回転してから保存する。
+    """
     images_dir.mkdir(parents=True, exist_ok=True)
     image_names = []
     doc = fitz.open(str(pdf_path))
@@ -308,7 +354,12 @@ def crop_table_images(
             clip = fitz.Rect(x0 - pad, y0 - pad, x1 + pad, y1 + pad) & page.rect
             pix = page.get_pixmap(clip=clip, dpi=dpi)
             fname = f"table_page{page_id}_{i}.png"
-            pix.save(images_dir / fname)
+            angle = detect_table_rotation(page, clip)
+            if angle == 0:
+                pix.save(images_dir / fname)
+            else:
+                image = Image.open(io.BytesIO(pix.tobytes("png")))
+                image.rotate(angle, expand=True).save(images_dir / fname)
             image_names.append(fname)
     finally:
         doc.close()
@@ -396,6 +447,7 @@ def extract_pdf(
     markdown_text = merge_page_break_sentences(markdown_text)
     markdown_text = fix_references_line_breaks(markdown_text)
     markdown_text = fix_citation_bracket_escapes(markdown_text)
+    markdown_text = fix_citation_paren_escapes(markdown_text)
 
     output_folder = Path(config_parser.get_output_folder(str(pdf_path)))
     base_filename = config_parser.get_base_filename(str(pdf_path))
