@@ -18,6 +18,9 @@
 - `paper-chapter-reviewer`（`.claude/agents/paper-chapter-reviewer.md` / `.codex/agents/paper-chapter-reviewer.toml`）:
   章ごとの数式レビュー担当。複数章が同じ`<論文名>_review.md`へ書き込むため、**並列dispatchせず必ず1章ずつ逐次実行する**
   （前章の完了報告を受けてから次章を起動する）。
+- `table-figure-reviewer`（`.claude/agents/table-figure-reviewer.md` / `.codex/agents/table-figure-reviewer.toml`）:
+  Table/Figureのキャプションと画像参照の対応関係修正担当。複数章が同じ`<論文名>_review.md`へ書き込むため、
+  **並列dispatchせず必ず1章ずつ逐次実行する**（前章の完了報告を受けてから次章を起動する）。
 - `docs-conciseness-editor`（`.claude/agents/docs-conciseness-editor.md` / `.codex/agents/docs-conciseness-editor.toml`）:
   SKILL.md・subagent定義・README.md・本ファイル（CLAUDE.md/AGENTS.md）等の運用ドキュメントの新規作成・改稿は、
   必ずこのsubagentへ委譲する。

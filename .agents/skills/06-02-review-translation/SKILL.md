@@ -57,7 +57,7 @@ postprocess/.venv/bin/python postprocess/src/check_translation.py output/<論文
 
 ## エラー時の対応
 - `<論文名>_translation_flags.csv`が存在しない場合、`06-01-translate`が未実行の可能性があるため報告する
-- フラグの原因が翻訳品質ではなく元CSV・`_review.md`側にあると判断した場合（例: 原文自体に誤りがある）、該当するSkill（`04-02-review-chapter`等）側の課題として報告する
+- フラグの原因が翻訳品質ではなく元CSV・`_review.md`側にあると判断した場合（例: 原文自体に誤りがある）、該当するSkill（`04-04-review-chapter`等）側の課題として報告する
 
 ## 完了条件・報告
 手順1〜3を終え、再実行した`check_translation.py`のフラグが0件（または残存理由を説明できる状態）になった時点で完了。以下を作業ログとして報告する。

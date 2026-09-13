@@ -1,12 +1,12 @@
 ---
 name: 05-01-split-sentences
-description: レビュー済みMarkdownを postprocess/src/split_sentences.py で文単位に分割しCSVへ出力する。LLMの判断を含まない決定論的な実行のみ。04-02-review-chapter（全章）・04-03-spot-check-review完了後に使う。
+description: レビュー済みMarkdownを postprocess/src/split_sentences.py で文単位に分割しCSVへ出力する。LLMの判断を含まない決定論的な実行のみ。04-04-review-chapter（全章）・04-05-spot-check-review完了後に使う。
 ---
 
 # Skill: 文章分割・CSV出力
 
 ## 目的
-`04-02-review-chapter`（全章）・`04-03-spot-check-review` 完了後の `<論文名>_review.md` を、`postprocess/src/split_sentences.py` を実行して文単位に分割し、CSVへ出力する。本Skill自体はLLMによる判断を含まない、決定論的な実行のみ。
+`04-04-review-chapter`（全章）・`04-05-spot-check-review` 完了後の `<論文名>_review.md` を、`postprocess/src/split_sentences.py` を実行して文単位に分割し、CSVへ出力する。本Skill自体はLLMによる判断を含まない、決定論的な実行のみ。
 
 ## 前提
 リポジトリルートの `Makefile` の `make split` ターゲットで、軽量venv（`postprocess/.venv`）の作成〜実行まで1コマンドで完結。marker-pdf/PyMuPDFは不要なため、Dockerは使用しない。

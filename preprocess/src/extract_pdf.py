@@ -399,20 +399,30 @@ def find_real_table_blocks(lines: list[str]) -> list[tuple[int, int]]:
 def replace_tables_with_images(
     markdown_text: str, image_names: list[str], images_subdir: str
 ) -> str:
+    """検出した実テーブルのMarkdown箇所を、対応する画像参照に差し替える。
+
+    「見つかったパイプテーブルブロック」と「切り出した画像」は、件数が一致する場合に限り
+    出現順の対応関係を信頼できる。marker-pdfは表によってパイプテーブルとして描画できず
+    本文から欠落したり地の文に混入したりすることがあり、この場合は件数が食い違う。
+    どのブロックがどの画像に対応するかを機械的に決め打ちすると誤った画像を挿入しかねない
+    ため、件数が一致しない場合は自動置換を行わない（安全側に倒す）。対応付けは後続のLLM
+    レビュー工程（`04-02-review-tables-figures`）に委ねる。
+    """
     lines = markdown_text.split("\n")
     blocks = find_real_table_blocks(lines)
 
     if len(blocks) != len(image_names):
         print(
             f"WARNING: 検出した実テーブルのMarkdown箇所({len(blocks)}件)と"
-            f"切り出した画像({len(image_names)}件)の数が一致しません。"
-            " 出力を目視確認してください。",
+            f"切り出した画像({len(image_names)}件)の数が一致しないため、"
+            "誤挿入を避けて画像の自動挿入をスキップしました。"
+            f" 切り出し済み画像: {', '.join(image_names) if image_names else 'なし'}"
+            "（04-02-review-tables-figuresで対応付けてください）。",
             file=sys.stderr,
         )
+        return markdown_text
 
     for idx, (start, end) in reversed(list(enumerate(blocks))):
-        if idx >= len(image_names):
-            continue
         lines[start:end] = [f"![table]({images_subdir}/{image_names[idx]})"]
 
     return "\n".join(lines)
