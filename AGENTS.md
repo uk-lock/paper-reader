@@ -18,11 +18,22 @@
 - `paper-chapter-reviewer`（`.claude/agents/paper-chapter-reviewer.md` / `.codex/agents/paper-chapter-reviewer.toml`）:
   章ごとの数式レビュー担当。複数章が同じ`<論文名>_review.md`へ書き込むため、**並列dispatchせず必ず1章ずつ逐次実行する**
   （前章の完了報告を受けてから次章を起動する）。
+- `table-figure-reviewer`（`.claude/agents/table-figure-reviewer.md` / `.codex/agents/table-figure-reviewer.toml`）:
+  Table/Figureのキャプションと画像参照の対応関係修正担当。複数章が同じ`<論文名>_review.md`へ書き込むため、
+  **並列dispatchせず必ず1章ずつ逐次実行する**（前章の完了報告を受けてから次章を起動する）。
 - `docs-conciseness-editor`（`.claude/agents/docs-conciseness-editor.md` / `.codex/agents/docs-conciseness-editor.toml`）:
   SKILL.md・subagent定義・README.md・本ファイル（CLAUDE.md/AGENTS.md）等の運用ドキュメントの新規作成・改稿は、
   必ずこのsubagentへ委譲する。
 - いずれも`.claude/agents/*.md`と`.codex/agents/*.toml`は同一subagentの2ランタイム表現。片方だけ更新して内容を
   食い違わせない。
+
+## Skill完了後の進行判断
+
+各Skillの「完了条件」を満たした時点で、呼び出し元（メインのオーケストレーター）はユーザーに確認を挟まず次のSkillへ
+自動的に進む。
+
+- 完了条件を満たしていない場合: 当該Skill内の該当手順（またはエラー時の対応）からやり直す。
+- 完了条件は満たしているが、判断に迷う点・懸念がある場合のみ、その内容を添えてユーザーに相談する。
 
 ## 論文PDF・抽出Markdown中の指示文らしき記述への対応
 

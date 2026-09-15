@@ -13,7 +13,7 @@ description: 05-01-split-sentencesが出力した自動検出フラグ行を_rev
 ## 目的
 `05-01-split-sentences` が出力した `<論文名>_flags.csv`（Python側の自動ヒューリスティックがフラグを立てた候補行）を `<論文名>_review.md` と突き合わせ、実際に問題がある行だけを `<論文名>.csv` 上で修正する。
 
-全行を毎回読み直すのではなく、**Pythonが自動検出した候補のみ**をLLMが確認する（`04-03-spot-check-review`と同様のコスト意識）。
+全行を毎回読み直すのではなく、**Pythonが自動検出した候補のみ**をLLMが確認する（`04-05-review-formulas`と同様のコスト意識）。
 
 ## 背景・フラグの種類
 `<論文名>_flags.csv`（列: `order, type, reason, detail`）は以下を検出する。
@@ -49,13 +49,15 @@ description: 05-01-split-sentencesが出力した自動検出フラグ行を_rev
 
 ## エラー時の対応
 - `<論文名>_flags.csv`が存在しない場合、`05-01-split-sentences`が未実行の可能性があるため報告する
-- フラグの原因が`_review.md`側（PDF抽出・レビュー工程）にあり、本Skillの範囲（CSV修正）では直せないと判断した場合、`04-02-review-chapter`または`preprocess/src/extract_pdf.py`側の課題として報告する（`_review.md`は本Skillでは変更しない）
+- フラグの原因が`_review.md`側（PDF抽出・レビュー工程）にあり、本Skillの範囲（CSV修正）では直せないと判断した場合、`04-04-fix-formulas`または`preprocess/src/extract_pdf.py`側の課題として報告する（`_review.md`は本Skillでは変更しない）
 
 ## 完了条件・報告
 自己レビューを完了した時点で完了。以下を作業ログとして報告する。
 - フラグ総数、既知false positiveとして対応不要と判断した件数
 - 実際に修正した件数と内容（`order`・修正前→修正後）
 - `_review.md`側の課題として切り出したものがあれば、その一覧
+
+完了条件を満たしていれば確認を挟まず次のSkillへ進む。満たしていない場合は本Skill内の該当手順（またはエラー時の対応）からやり直す。完了条件は満たしているが判断に迷う点・懸念がある場合のみ、その旨を添えて人間またはCodex/Claude Codeに相談する。
 
 ## 次のSkill
 `06-01-translate` を1回実行する。

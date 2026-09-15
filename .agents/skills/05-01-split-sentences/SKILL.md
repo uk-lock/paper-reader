@@ -1,12 +1,12 @@
 ---
 name: 05-01-split-sentences
-description: レビュー済みMarkdownを postprocess/src/split_sentences.py で文単位に分割しCSVへ出力する。LLMの判断を含まない決定論的な実行のみ。04-02-review-chapter（全章）・04-03-spot-check-review完了後に使う。
+description: レビュー済みMarkdownを postprocess/src/split_sentences.py で文単位に分割しCSVへ出力する。LLMの判断を含まない決定論的な実行のみ。04-04-fix-formulas（全章）・04-05-review-formulas完了後に使う。
 ---
 
 # Skill: 文章分割・CSV出力
 
 ## 目的
-`04-02-review-chapter`（全章）・`04-03-spot-check-review` 完了後の `<論文名>_review.md` を、`postprocess/src/split_sentences.py` を実行して文単位に分割し、CSVへ出力する。本Skill自体はLLMによる判断を含まない、決定論的な実行のみ。
+`04-04-fix-formulas`（全章）・`04-05-review-formulas` 完了後の `<論文名>_review.md` を、`postprocess/src/split_sentences.py` を実行して文単位に分割し、CSVへ出力する。本Skill自体はLLMによる判断を含まない、決定論的な実行のみ。
 
 ## 前提
 リポジトリルートの `Makefile` の `make split` ターゲットで、軽量venv（`postprocess/.venv`）の作成〜実行まで1コマンドで完結。marker-pdf/PyMuPDFは不要なため、Dockerは使用しない。
@@ -44,6 +44,8 @@ description: レビュー済みMarkdownを postprocess/src/split_sentences.py �
 
 ## 完了条件・報告
 手順3・4の確認が全て取れた時点で完了。生成された `<論文名>.csv` のパスと、`type` 別の行数、`<論文名>_flags.csv` のフラグ件数を作業ログとして報告する。
+
+完了条件を満たしていれば確認を挟まず次のSkillへ進む。満たしていない場合は本Skill内の該当手順（またはエラー時の対応）からやり直す。完了条件は満たしているが判断に迷う点・懸念がある場合のみ、その旨を添えて人間またはCodex/Claude Codeに相談する。
 
 ## 次のSkill
 `05-02-review-split` を1回実行する。
