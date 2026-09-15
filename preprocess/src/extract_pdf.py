@@ -15,6 +15,10 @@ r"""PDFをMarkdownへ変換するProgram（marker-pdf + PyMuPDF ハイブリッ�
   （`merge_page_break_sentences`）
 - 参考文献セクションは、marker-pdfの出力ではページ単位で全エントリが1段落に連結されるため、
   `[N] `の連番境界で1エントリ1段落に分割する（`fix_references_line_breaks`）
+- 著者名＋年スタイルの参考文献は`[N] `の連番が無く、代わりに`- Author...`という箇条書きで
+  出力されるが、エントリ間に空行が無いため後続処理（split_sentences.py）のブロック判定と
+  噛み合わず、リスト全体が数個の塊に潰れてしまう。折り返しによる誤ネストの結合も含め、
+  1エントリ1段落（空行区切り）に整形する（`fix_bulleted_references`）
 - 引用番号リンクのエスケープ済み角括弧（`\[N\]`）は、LaTeX形式のディスプレイ数式区切り
   （`\[ ... \]`）と衝突し、数式対応Markdownプレビューで表示が崩れるため、HTMLエンティティ
   （`&#91;` / `&#93;`）に置き換える（`fix_citation_bracket_escapes`）
@@ -70,16 +74,22 @@ def remove_span_anchors(markdown_text: str) -> str:
     return EXCESS_BLANK_LINES_RE.sub("\n\n", text)
 
 
-# 脚注定義段落: 段落の先頭が `<span id="page-P-K"></span><sup>N</sup>` で始まるもの。
+# 脚注定義段落: 段落の先頭が `<span id="page-P-K"></span><sup>N</sup>` で始まるもの
+# （同じ位置に複数の要素のアンカーが重なり、spanが2つ以上連続することがあるため1つ以上とする）。
 # 数式中の上付き文字（例: d<sup>k</sup>）や著者注記（<sup>∗</sup>等、spanを伴わない）とは
 # 区別できる（脚注定義には必ずページアンカーspanが直前に付くため）。
 FOOTNOTE_DEF_RE = re.compile(
-    r'\n\n<span id="page-\d+-\d+"></span><sup>(\d+)</sup>(.+?)\n\n',
+    r'\n\n(?:<span id="page-\d+-\d+"></span>)+<sup>(\d+)</sup>(.+?)\n\n',
     re.DOTALL,
 )
 # 本文中の脚注参照マーカー（リンク化された上付き文字）。
 # 数式の上付き文字は`[...](...)`でリンク化されないため、これとは衝突しない。
 INLINE_FOOTNOTE_REF_RE = re.compile(r"\s*\[<sup>(\d+)</sup>\]\(#page-\d+-\d+\)\s*")
+# ページアンカーspanが省略された脚注定義（フォールバック用）。marker-pdfはページレイアウト
+# 上の理由と思われる要因で、一部の脚注定義だけspanを付けずに出力することがある
+# （例: 同ページの図表が別のアンカーを使う場合等）。無関係な上付き文字との誤爆を避けるため、
+# 本文参照側で既に検出済みの脚注番号に一致する場合のみフォールバックとして採用する。
+FOOTNOTE_DEF_NO_ANCHOR_RE = re.compile(r"\n\n<sup>(\d+)</sup>\s*(.+?)\n\n", re.DOTALL)
 _FOOTNOTE_PLACEHOLDER = "\n\n\x00FOOTNOTE_REMOVED\x00\n\n"
 # プレースホルダーの直後が小文字始まりの地の文なら、元は1文だったとみなして結合する。
 # 画像・表キャプション・見出し・別アンカー等が直後に来る場合は誤結合を避け、そのまま改行を残す。
@@ -93,6 +103,9 @@ def fix_footnotes(markdown_text: str) -> str:
     このため脚注の本文がTableキャプションや画像参照を挟んで本文中の1文を分断してしまう
     ことがある（例: `...on the` [脚注本文] `Table 3: ...` [画像] `development set...`）。
     脚注定義を本文から抜き出して文末の脚注一覧へ集約し、本文中には`[^N]`のみを残す。
+
+    定義側のページアンカーspanが省略されている脚注（`FOOTNOTE_DEF_NO_ANCHOR_RE`参照）も
+    フォールバックで捕捉するため、通常はこの関数だけで脚注に起因する文分断は解消される。
     """
     footnotes: dict[str, str] = {}
 
@@ -102,6 +115,21 @@ def fix_footnotes(markdown_text: str) -> str:
         return _FOOTNOTE_PLACEHOLDER
 
     markdown_text = FOOTNOTE_DEF_RE.sub(_capture, markdown_text)
+
+    # 本文参照側で使われている脚注番号のうち、上記でまだ定義を捕捉できていないものは、
+    # ページアンカーspanが省略された定義（フォールバック）として捕捉する。
+    referenced_numbers = set(INLINE_FOOTNOTE_REF_RE.findall(markdown_text))
+    missing_numbers = referenced_numbers - footnotes.keys()
+    if missing_numbers:
+
+        def _capture_fallback(match: re.Match) -> str:
+            number = match.group(1)
+            if number not in missing_numbers:
+                return match.group(0)
+            footnotes[number] = match.group(2).strip()
+            return _FOOTNOTE_PLACEHOLDER
+
+        markdown_text = FOOTNOTE_DEF_NO_ANCHOR_RE.sub(_capture_fallback, markdown_text)
 
     while _FOOTNOTE_PLACEHOLDER in markdown_text:
         idx = markdown_text.index(_FOOTNOTE_PLACEHOLDER)
@@ -168,6 +196,54 @@ def fix_references_line_breaks(markdown_text: str) -> str:
         for start, end in zip(split_points, split_points[1:] + [len(combined)], strict=True)
     ]
     new_section_text = "\n\n" + "\n\n".join(entries) + "\n\n"
+    return markdown_text[:section_start] + new_section_text + markdown_text[section_end:]
+
+
+TOP_BULLET_RE = re.compile(r"^- ")
+NESTED_BULLET_RE = re.compile(r"^\s+- ?")
+
+
+def fix_bulleted_references(markdown_text: str) -> str:
+    """著者名＋年スタイルの参考文献（箇条書き）を1エントリ1段落に整形する。
+
+    marker-pdfは著者名＋年スタイルの参考文献を`- Author...`という箇条書きで出力するが、
+    `fix_references_line_breaks`が対象とする番号付きスタイル（`[N] `）と異なりエントリ間に
+    空行が挿入されない。後続処理（split_sentences.py）は空行区切りでブロックを判定するため、
+    このままではリスト全体（数十エントリ）が空行のある箇所だけで数個の巨大な塊に潰れてしまう。
+    さらに1エントリが長く元PDF上で折り返される場合、折り返し後の行が誤ってネストした箇条書き
+    （`  - ...`）として出力されることがある。
+    Referencesセクション内の各行を走査し、非インデントの`- `行を新規エントリの開始、
+    インデントされた`  - `行を直前エントリの折り返し継続とみなして1行に結合したうえで、
+    エントリ間に空行を挿入する。箇条書き（`- `始まり）が1件も見つからない場合（番号付き
+    スタイルの場合等）は元のテキストをそのまま返す。
+    """
+    heading_match = REFERENCES_HEADING_RE.search(markdown_text)
+    if not heading_match:
+        return markdown_text
+
+    section_start = heading_match.end()
+    next_heading_match = NEXT_HEADING_RE.search(markdown_text, section_start)
+    section_end = next_heading_match.start() if next_heading_match else len(markdown_text)
+
+    entries: list[str] = []
+    for line in markdown_text[section_start:section_end].split("\n"):
+        if not line.strip():
+            continue
+        if NESTED_BULLET_RE.match(line):
+            continuation = NESTED_BULLET_RE.sub("", line).strip()
+            if entries:
+                entries[-1] = f"{entries[-1]} {continuation}"
+            continue
+        if TOP_BULLET_RE.match(line):
+            entries.append(line[2:].strip())
+            continue
+        if entries:
+            entries[-1] = f"{entries[-1]} {line.strip()}"
+
+    if not entries:
+        return markdown_text
+
+    new_section_text = "\n\n" + "\n\n".join(f"- {e}" for e in entries) + "\n\n"
     return markdown_text[:section_start] + new_section_text + markdown_text[section_end:]
 
 
@@ -456,6 +532,7 @@ def extract_pdf(
     # （merge_page_break_sentencesが表ブロックを割り込みブロックとして認識するため）。
     markdown_text = merge_page_break_sentences(markdown_text)
     markdown_text = fix_references_line_breaks(markdown_text)
+    markdown_text = fix_bulleted_references(markdown_text)
     markdown_text = fix_citation_bracket_escapes(markdown_text)
     markdown_text = fix_citation_paren_escapes(markdown_text)
 

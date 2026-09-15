@@ -12,6 +12,11 @@
   file_id・URLは変わらない（`extract_pdf.py`をやり直した場合の再実行でも安全）
 - Markdown中のローカル画像参照をDrive直リンク（`https://lh3.googleusercontent.com/d/<file_id>`）
   へ書き換える
+- `<論文名>.md`中の画像参照をスキャンする都合上、`extract_pdf.py`が個数不一致で表画像の自動挿入を
+  スキップした場合、その時点では未参照の表画像はアップロードされない。`04-02-fix-tables-figures`
+  等が後から`_review.md`へローカル画像参照を挿入した場合は、`_review.md`を対象に本Programを
+  再実行してDrive URLへ書き換える（`<論文名>.md`はファイル名を問わないため、対象を変えて
+  複数回実行しても安全）
 
 前提:
 - `rclone`がGoogle Drive宛に読み書き両対応のスコープでOAuth認可済みであること
