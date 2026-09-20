@@ -19,6 +19,9 @@ r"""PDFをMarkdownへ変換するProgram（marker-pdf + PyMuPDF ハイブリッ�
   出力されるが、エントリ間に空行が無いため後続処理（split_sentences.py）のブロック判定と
   噛み合わず、リスト全体が数個の塊に潰れてしまう。折り返しによる誤ネストの結合も含め、
   1エントリ1段落（空行区切り）に整形する（`fix_bulleted_references`）
+- 著者名＋年スタイルで箇条書きにもならない場合は、ページ単位で全エントリが1段落に連結される。
+  `Surname, I.`で始まり直前エントリに`(YYYY)`が含まれる境界で1エントリ1段落に分割する
+  （`fix_author_year_references`）
 - 引用番号リンクのエスケープ済み角括弧（`\[N\]`）は、LaTeX形式のディスプレイ数式区切り
   （`\[ ... \]`）と衝突し、数式対応Markdownプレビューで表示が崩れるため、HTMLエンティティ
   （`&#91;` / `&#93;`）に置き換える（`fix_citation_bracket_escapes`）
@@ -244,6 +247,50 @@ def fix_bulleted_references(markdown_text: str) -> str:
         return markdown_text
 
     new_section_text = "\n\n" + "\n\n".join(f"- {e}" for e in entries) + "\n\n"
+    return markdown_text[:section_start] + new_section_text + markdown_text[section_end:]
+
+
+# エントリ先頭の`Surname, I.`（姓＋イニシャル）。姓は複合姓・アクセント記号付き文字を許容する。
+# `In Bishop, C. M., editor`のような書籍収録の`In `始まりは、エントリ内部なので境界にしない。
+AUTHOR_YEAR_ENTRY_START_RE = re.compile(
+    r"(?<=\.)\s+(?!In )(?=[A-Z][^\s,.()]*(?: [^\s,.()]+){0,2}, [A-Z]\.)"
+)
+PAREN_YEAR_RE = re.compile(r"\(\d{4}[a-z]?\)")
+
+
+def fix_author_year_references(markdown_text: str) -> str:
+    """箇条書きにならない著者名＋年スタイルの参考文献を1エントリ1段落に分割する。
+
+    `fix_references_line_breaks`（番号付き）・`fix_bulleted_references`（箇条書き）のどちらにも
+    該当しない場合、marker-pdfはページ単位で全エントリを1段落に連結して出力する。
+    直前が`.`で次が`Surname, I.`という位置を境界候補とし、直前のエントリ断片に`(YYYY)`が
+    含まれている場合のみ境界として採用する（著者リスト内の`Deng, L.`等での誤分割を防ぐ）。
+    番号付き・箇条書きスタイルの場合、または境界が1件も見つからない場合は元のテキストを返す。
+    """
+    heading_match = REFERENCES_HEADING_RE.search(markdown_text)
+    if not heading_match:
+        return markdown_text
+
+    section_start = heading_match.end()
+    next_heading_match = NEXT_HEADING_RE.search(markdown_text, section_start)
+    section_end = next_heading_match.start() if next_heading_match else len(markdown_text)
+
+    section = markdown_text[section_start:section_end]
+    if TOP_BULLET_RE.search(section) or re.search(r"^\[1\] ", section, re.MULTILINE):
+        return markdown_text
+
+    combined = BLANK_LINES_RE.sub(" ", section).strip()
+    entries: list[str] = []
+    start = 0
+    for match in AUTHOR_YEAR_ENTRY_START_RE.finditer(combined):
+        if PAREN_YEAR_RE.search(combined, start, match.start()):
+            entries.append(combined[start : match.start()].strip())
+            start = match.end()
+    if not entries:
+        return markdown_text
+    entries.append(combined[start:].strip())
+
+    new_section_text = "\n\n" + "\n\n".join(entries) + "\n\n"
     return markdown_text[:section_start] + new_section_text + markdown_text[section_end:]
 
 
@@ -533,6 +580,7 @@ def extract_pdf(
     markdown_text = merge_page_break_sentences(markdown_text)
     markdown_text = fix_references_line_breaks(markdown_text)
     markdown_text = fix_bulleted_references(markdown_text)
+    markdown_text = fix_author_year_references(markdown_text)
     markdown_text = fix_citation_bracket_escapes(markdown_text)
     markdown_text = fix_citation_paren_escapes(markdown_text)
 
