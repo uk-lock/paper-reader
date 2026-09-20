@@ -27,7 +27,7 @@ description: レビュー済みMarkdownを postprocess/src/split_sentences.py �
 2. コマンドの終了コードが0であることを確認
 3. 出力先に `<論文名>.csv` と `<論文名>_flags.csv` が生成されていることを確認
 4. `<論文名>.csv` を開き、以下を目視確認する
-   - `type` 列が `heading` / `body` / `caption` / `reference` / `footnote` のいずれかになっていること
+   - `type` 列が `heading` / `body` / `caption` / `image` / `reference` / `footnote` のいずれかになっていること
    - 見出し（`type=heading`）の `heading_level` が元Markdownの`#`数と一致していること
    - 数式を含む行が、数式部分で不自然に分断されていないこと
    - `order` が1始まりの連番で欠番・重複が無いこと
@@ -36,7 +36,7 @@ description: レビュー済みMarkdownを postprocess/src/split_sentences.py �
 - `page_number` は現状空欄（marker-pdfのページ境界情報を保持していないため）
 - キャプションでまれに短い断片（例: `(right)`）が独立行になることがある（pysbdの既知のクセ、軽微なため許容）
 
-上記以外に、ページ跨ぎの脚注挿入による文の分断・参照文献の段落連結は `preprocess/src/extract_pdf.py`（`fix_footnotes` / `fix_references_line_breaks`）側で解決済み。本Skillはその出力（脚注定義 `[^N]: ...` → `type=footnote`、参照文献1エントリ1段落 → `type=reference`）を前提とする。
+上記以外に、ページ跨ぎの脚注挿入による文の分断・参照文献の段落連結は `preprocess/src/extract_pdf.py` 側で解決済み。脚注は `fix_footnotes`、参照文献は `fix_references_line_breaks`（番号付き）・`fix_bulleted_references`（箇条書き著者年）・`fix_author_year_references`（箇条書きにならず段落連結された著者年形式。`Surname, I.` 始まりで直前エントリに `(YYYY)` を含む境界で分割）の3種で、3形式に対応。本Skillはその出力（脚注定義 `[^N]: ...` → `type=footnote`、参照文献1エントリ1段落 → `type=reference`）を前提とする。
 
 ## エラー時の対応
 - `make split` が非0で終了した場合、標準エラー出力のログから原因（`REVIEW`未指定、入力ファイル不在等）を特定する
