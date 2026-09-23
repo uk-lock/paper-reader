@@ -146,20 +146,23 @@ def classify_and_split(blocks: list[str]) -> list[Record]:
             records.append(Record(order=order, type="image", heading_level=None, text=block))
             continue
 
-        if in_references:
-            # 参照文献は段落単位（extract_pdf.py側で1エントリ1段落に整形済み）でレコード化する
-            order += 1
-            records.append(Record(order=order, type="reference", heading_level=None, text=block))
-            continue
-
         footnote_match = FOOTNOTE_DEF_RE.match(block)
         if footnote_match:
-            # extract_pdf.pyが集約した脚注定義（[^N]: ...）。マーカーを取り除いた本文を分割する
+            # extract_pdf.pyが集約した脚注定義（[^N]: ...）。マーカーを取り除いた本文を分割する。
+            # References節の直後（間に他の見出しを挟まない文書末尾）に置かれることがあり、
+            # その場合in_referencesがTrueのままになるため、reference判定より先にチェックする
+            # （`[^N]: `という構文は参照文献エントリと衝突しないため優先しても安全）。
             for sentence in split_sentences(footnote_match.group(2)):
                 order += 1
                 records.append(
                     Record(order=order, type="footnote", heading_level=None, text=sentence)
                 )
+            continue
+
+        if in_references:
+            # 参照文献は段落単位（extract_pdf.py側で1エントリ1段落に整形済み）でレコード化する
+            order += 1
+            records.append(Record(order=order, type="reference", heading_level=None, text=block))
             continue
 
         block_type = "caption" if CAPTION_RE.match(block) else "body"

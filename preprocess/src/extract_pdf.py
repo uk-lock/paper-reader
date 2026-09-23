@@ -31,6 +31,17 @@ r"""PDFをMarkdownへ変換するProgram（marker-pdf + PyMuPDF ハイブリッ�
 - LaTeXの`sidewaystable`等でPDF内容自体が90度回転して組版された表は、切り出したテーブル
   画像も回転したまま保存されてしまうため、テキスト方向（`dir`）から回転を検出し正立させて
   保存する（`detect_table_rotation` / `crop_table_images`）
+- marker-pdfのレイアウト検出は図（Figure/Diagram）でも失敗することがある。線画（circle-and-
+  arrow系の図解や、データ点を線でつないだだけの図等）を化学構造式と誤認識してChemicalBlock
+  として検出してしまい、画像化されず`...`等のプレースホルダーのみが残るケース、および
+  スパースな線画をレイアウトブロックとして一切検出できず「Figure N:」キャプションに対応する
+  領域が丸ごと欠落するケースがある（DeepGP論文のFigure 1・2・4で実データ検証済み）。
+  前者はChemicalBlockのbboxを、後者はキャプション直前の空白域（前後の実ブロックに挟まれた
+  隙間）をそれぞれPyMuPDFで切り出し、候補画像としてMarkdownと同じディレクトリ直下に保存する
+  （`collect_chemical_block_regions` / `collect_orphan_figure_regions` /
+  `crop_figure_fallback_images`）。表と異なりキャプションとの対応付けは1:1で機械的に確定
+  できないため、Markdownへの自動挿入は行わず、候補画像として後続のLLMレビュー工程
+  （`04-02-fix-tables-figures`）に委ねる。
 
 使い方:
     python preprocess/src/extract_pdf.py pdf/example.pdf --output-dir output
@@ -489,6 +500,129 @@ def crop_table_images(
     return image_names
 
 
+# 図（Figure/Diagram）の画像化がmarker-pdfのレイアウト検出段階で失敗するケースへの
+# フォールバック。ChemicalBlockは検出はされるが誤分類、空白域は検出自体がされない
+# ケースに対応する（モジュールdocstring参照）。
+FIGURE_LIKE_BLOCK_TYPES = {
+    BlockTypes.Picture,
+    BlockTypes.PictureGroup,
+    BlockTypes.Figure,
+    BlockTypes.FigureGroup,
+    BlockTypes.Diagram,
+    BlockTypes.ChemicalBlock,
+}
+LOW_LEVEL_BLOCK_TYPES = {BlockTypes.Line, BlockTypes.Span, BlockTypes.Char}
+IGNORABLE_GAP_BLOCK_TYPES = {BlockTypes.PageFooter, BlockTypes.PageHeader, BlockTypes.Footnote}
+FIGURE_CAPTION_TEXT_RE = re.compile(r"^Figure\s+\d+\s*:", re.IGNORECASE)
+# キャプション直前に挟まる「(a) (b) (c)」のようなパネルラベル行は、図そのものの一部と
+# みなし、空白域探索時には無視する（実ブロックとして扱うと図の直前の隙間を見誤る）。
+PANEL_LABEL_ONLY_RE = re.compile(r"^(\(?[a-z]\)?\s*)+$", re.IGNORECASE)
+MIN_ORPHAN_FIGURE_GAP = 20.0  # pt。これ未満の隙間は単なる行間とみなし対象外にする。
+
+
+def collect_chemical_block_regions(document) -> list[tuple[int, tuple[float, float, float, float]]]:
+    """ChemicalBlockとして誤検出された図（線画等）を(page_id, bbox)のリストとして返す。
+
+    marker-pdfのレイアウト検出は、circle-and-arrow系の線画やデータ点を線でつないだだけの
+    図を化学構造式と誤認識し、ChemicalBlockとして検出することがある。この場合Markdown上は
+    画像化されず`...`等のプレースホルダーのみが残る（DeepGP論文のFigure 1・2で実データ
+    検証済み）。
+    """
+    regions = []
+    for page in document.pages:
+        for block in page.children or []:
+            if block.block_type == BlockTypes.ChemicalBlock:
+                regions.append((page.page_id, block.polygon.bbox))
+    return regions
+
+
+def collect_orphan_figure_regions(
+    document, min_gap: float = MIN_ORPHAN_FIGURE_GAP
+) -> list[tuple[int, tuple[float, float, float, float]]]:
+    """図ブロックが一切検出されなかった「Figure N:」キャプションについて、
+    直前の実ブロックとの間の空白域を候補領域として(page_id, bbox)のリストで返す。
+
+    marker-pdfのレイアウト検出は、線が疎らな図（データ点を線でつないだだけの図等）を
+    ブロックとして一切検出できないことがある。この場合Table同様に検出済みbboxを流用する
+    ことができないため、キャプション直前の空白（前の実ブロックの下端からキャプションの
+    上端まで）を候補領域とみなす（DeepGP論文のFigure 4で実データ検証済み）。
+    キャプションの直前に既にFigure系ブロックがある場合（正常に検出できているケース）は
+    対象外とする。
+    """
+    orphans = []
+    for page in document.pages:
+        children = sorted(
+            (b for b in (page.children or []) if b.block_type not in LOW_LEVEL_BLOCK_TYPES),
+            key=lambda b: b.polygon.bbox[1],
+        )
+        for i, block in enumerate(children):
+            if block.block_type != BlockTypes.Caption:
+                continue
+            caption_text = (block.raw_text(document) or "").strip()
+            if not FIGURE_CAPTION_TEXT_RE.match(caption_text):
+                continue
+
+            prev = None
+            j = i - 1
+            while j >= 0:
+                candidate = children[j]
+                if candidate.block_type in FIGURE_LIKE_BLOCK_TYPES:
+                    prev = candidate
+                    break
+                candidate_text = (candidate.raw_text(document) or "").strip()
+                is_ignorable = (
+                    candidate.block_type in IGNORABLE_GAP_BLOCK_TYPES
+                    or not candidate_text
+                    or PANEL_LABEL_ONLY_RE.match(candidate_text)
+                )
+                if is_ignorable:
+                    j -= 1
+                    continue
+                prev = candidate
+                break
+
+            if prev is None or prev.block_type in FIGURE_LIKE_BLOCK_TYPES:
+                continue
+
+            gap_top = prev.polygon.bbox[3]
+            gap_bottom = block.polygon.bbox[1]
+            if gap_bottom - gap_top < min_gap:
+                continue
+            x0, _, x1, _ = block.polygon.bbox
+            orphans.append((page.page_id, (x0, gap_top, x1, gap_bottom)))
+    return orphans
+
+
+def crop_figure_fallback_images(
+    pdf_path: Path,
+    figure_regions: list[tuple[int, tuple[float, float, float, float]]],
+    output_folder: Path,
+    dpi: int,
+    pad: float,
+) -> list[str]:
+    """検出漏れ・誤分類した図の候補領域を元PDFから画像として切り出し、Markdownと同じ
+    ディレクトリ直下（marker-pdfが生成する`_page_<N>_Figure_<M>.jpeg`等と同じ階層）に
+    保存する。Table（`crop_table_images`）と異なりキャプションとの1:1対応が機械的に
+    確定できないため、Markdownへの自動挿入は行わず、後続のLLMレビュー工程
+    （`04-02-fix-tables-figures`）が候補画像として参照する前提で保存するだけに留める。
+    保存したファイル名のリストを返す。
+    """
+    image_names = []
+    doc = fitz.open(str(pdf_path))
+    try:
+        for i, (page_id, bbox) in enumerate(figure_regions):
+            page = doc[page_id]
+            x0, y0, x1, y1 = bbox
+            clip = fitz.Rect(x0 - pad, y0 - pad, x1 + pad, y1 + pad) & page.rect
+            pix = page.get_pixmap(clip=clip, dpi=dpi)
+            fname = f"_page_{page_id}_FigureFallback_{i}.png"
+            pix.save(output_folder / fname)
+            image_names.append(fname)
+    finally:
+        doc.close()
+    return image_names
+
+
 def find_real_table_blocks(lines: list[str]) -> list[tuple[int, int]]:
     """Markdown行リストから「実テーブル」とみなせるパイプテーブル領域を検出する。
 
@@ -568,6 +702,13 @@ def extract_pdf(
     table_regions = collect_table_regions(document)
     print(f"検出したTable数: {len(table_regions)}")
 
+    chemical_block_regions = collect_chemical_block_regions(document)
+    orphan_figure_regions = collect_orphan_figure_regions(document)
+    print(
+        f"図のフォールバック対象: ChemicalBlock誤検出={len(chemical_block_regions)}件、"
+        f"検出漏れの空白域={len(orphan_figure_regions)}件"
+    )
+
     renderer = converter.resolve_dependencies(converter.renderer)
     rendered = renderer(document)
     markdown_text, _extension, _images = text_from_rendered(rendered)
@@ -596,6 +737,13 @@ def extract_pdf(
     hybrid_markdown = replace_tables_with_images(markdown_text, image_names, images_dirname)
     markdown_path = output_folder / f"{base_filename}.md"
     markdown_path.write_text(hybrid_markdown, encoding="utf-8")
+
+    figure_fallback_regions = chemical_block_regions + orphan_figure_regions
+    if figure_fallback_regions:
+        figure_fallback_names = crop_figure_fallback_images(
+            pdf_path, figure_fallback_regions, output_folder, dpi, table_pad
+        )
+        print(f"図のフォールバック候補画像を保存: {', '.join(figure_fallback_names)}")
 
     print(f"完了: {time.time() - t0:.1f}s -> {markdown_path}")
     return markdown_path
