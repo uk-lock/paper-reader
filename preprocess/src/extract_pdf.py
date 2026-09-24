@@ -171,6 +171,26 @@ REFERENCES_HEADING_RE = re.compile(r"^#+\s+References[ \t]*$", re.MULTILINE)
 # 次章がH4等）。そのため「次に見出しが来るまで」をH2限定にせず、レベル不問で判定する。
 NEXT_HEADING_RE = re.compile(r"^#+\s", re.MULTILINE)
 BLANK_LINES_RE = re.compile(r"\n\s*\n")
+# marker-pdfが見出しとして認識せず、直後の著者名テキストと同一段落に連結して出力した
+# "References"（空行の直後に単語として出現し、直後に大文字始まりの語が続く）。
+INLINE_REFERENCES_START_RE = re.compile(r"(?<=\n\n)References\s+(?=[A-Z])")
+
+
+def normalize_references_heading(markdown_text: str) -> str:
+    """見出し化されずに本文へ連結された"References"をH2見出しへ変換する。
+
+    marker-pdfは"References"の文字サイズが本文と大差ない場合、見出しとして認識せず
+    直後の著者名テキストと同一段落で出力することがある。後続の`fix_*_references`系
+    関数はいずれも`REFERENCES_HEADING_RE`で見出しを検出できて初めて動作するため、
+    見出し化されないままだと参考文献リストの分割処理が一切適用されない。
+    既に"References"見出しが存在する場合は何もしない。
+    """
+    if REFERENCES_HEADING_RE.search(markdown_text):
+        return markdown_text
+    match = INLINE_REFERENCES_START_RE.search(markdown_text)
+    if not match:
+        return markdown_text
+    return markdown_text[: match.start()] + "## References\n\n" + markdown_text[match.end() :]
 
 
 def fix_references_line_breaks(markdown_text: str) -> str:
@@ -297,6 +317,60 @@ def fix_author_year_references(markdown_text: str) -> str:
         if PAREN_YEAR_RE.search(combined, start, match.start()):
             entries.append(combined[start : match.start()].strip())
             start = match.end()
+    if not entries:
+        return markdown_text
+    entries.append(combined[start:].strip())
+
+    new_section_text = "\n\n" + "\n\n".join(entries) + "\n\n"
+    return markdown_text[:section_start] + new_section_text + markdown_text[section_end:]
+
+
+# 参考文献1エントリの末尾（西暦年+オプションの版違い文字+ピリオド）から次エントリの
+# 著者名（大文字+小文字で始まる単語）への境界。かっこ書きの年（(YYYY)）を使わず文末に
+# そのまま西暦年を置くスタイル（「名 姓, 名 姓, ..., and 名 姓. Title. Venue, YYYY.」の
+# ようなNeurIPS/ICML系の参考文献に多い）を対象とする。著者名は"and"接続・ハイフン複合姓・
+# アクセント文字の欠落等でパターンが多様なため、次エントリ側の形状チェックは最小限に留める。
+YEAR_END_ENTRY_BOUNDARY_RE = re.compile(r"(?:(?<=\d{4}\.)|(?<=\d{4}[a-z]\.))\s+(?=[A-Z][a-z])")
+# fix_footnotesが文書末尾に脚注ブロックを追加する際の区切り（`\n\n---\n\n`）。
+FOOTNOTE_BLOCK_SEPARATOR_RE = re.compile(r"\n\n---\n\n")
+
+
+def fix_year_end_author_references(markdown_text: str) -> str:
+    """かっこ書きの年を使わない著者名+年スタイルの参考文献を1エントリ1段落に分割する。
+
+    `fix_author_year_references`は`Surname, I. (YYYY)`のようなかっこ書き年スタイルのみを
+    対象とするため、「名 姓, 名 姓, ..., and 名 姓. Title. Venue, YYYY.」のように文末に
+    西暦年をそのまま置くスタイルには対応できない。本関数はその補完として、直前のエントリ
+    末尾が`YYYY.`で終わり、直後が新しい著者名らしき大文字始まりの単語列である位置を
+    境界候補とする。対象セクションが既に複数段落（空行区切り）に分割済みの場合は
+    二重処理を避けるため何もしない。境界が1件も見つからない場合も元のテキストを返す。
+    """
+    heading_match = REFERENCES_HEADING_RE.search(markdown_text)
+    if not heading_match:
+        return markdown_text
+
+    section_start = heading_match.end()
+    next_heading_match = NEXT_HEADING_RE.search(markdown_text, section_start)
+    section_end = next_heading_match.start() if next_heading_match else len(markdown_text)
+    # 見出しが無い脚注ブロック（fix_footnotesが`\n\n---\n\n`区切りで文書末尾に挿入する）が
+    # 後続する場合、それを参考文献セクションに含めてしまうと脚注間の空行を「既に分割済み」
+    # と誤検出してしまうため、脚注ブロックの手前でセクションを打ち切る。
+    footnote_block_match = FOOTNOTE_BLOCK_SEPARATOR_RE.search(
+        markdown_text, section_start, section_end
+    )
+    if footnote_block_match:
+        section_end = footnote_block_match.start()
+
+    section = markdown_text[section_start:section_end]
+    combined = section.strip()
+    if BLANK_LINES_RE.search(combined):
+        return markdown_text
+
+    entries: list[str] = []
+    start = 0
+    for match in YEAR_END_ENTRY_BOUNDARY_RE.finditer(combined):
+        entries.append(combined[start : match.start()].strip())
+        start = match.end()
     if not entries:
         return markdown_text
     entries.append(combined[start:].strip())
@@ -719,9 +793,11 @@ def extract_pdf(
     # 表はまだ画像化されていない（生のパイプテーブル記法）段階で実行する必要がある
     # （merge_page_break_sentencesが表ブロックを割り込みブロックとして認識するため）。
     markdown_text = merge_page_break_sentences(markdown_text)
+    markdown_text = normalize_references_heading(markdown_text)
     markdown_text = fix_references_line_breaks(markdown_text)
     markdown_text = fix_bulleted_references(markdown_text)
     markdown_text = fix_author_year_references(markdown_text)
+    markdown_text = fix_year_end_author_references(markdown_text)
     markdown_text = fix_citation_bracket_escapes(markdown_text)
     markdown_text = fix_citation_paren_escapes(markdown_text)
 
