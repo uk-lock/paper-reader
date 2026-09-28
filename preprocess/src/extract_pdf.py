@@ -108,6 +108,64 @@ _FOOTNOTE_PLACEHOLDER = "\n\n\x00FOOTNOTE_REMOVED\x00\n\n"
 # プレースホルダーの直後が小文字始まりの地の文なら、元は1文だったとみなして結合する。
 # 画像・表キャプション・見出し・別アンカー等が直後に来る場合は誤結合を避け、そのまま改行を残す。
 _CONTINUATION_NEXT_RE = re.compile(r"\A[a-z]")
+# 本文参照・定義の両方がリンク/アンカー無しの素の`<sup>N</sup>`で出力される論文（ICML形式等）
+# 向けのフォールバック。段落先頭の`<sup>N</sup>`を定義候補とする。
+UNLINKED_FOOTNOTE_DEF_RE = re.compile(r"\n\n<sup>(\d+)</sup>[ \t]*(.+?)(?=\n\n|\Z)", re.DOTALL)
+# 定義本文の書き出し（大文字始まりの文、またはURL）。数式段落（`<sup>1</sup> Z p0(ω)`等）を
+# 除外するため、書き出しに加えて3文字以上の英単語を最低3語含むことも条件とする。
+_UNLINKED_DEF_TEXT_START_RE = re.compile(r"\A(?:[A-Z]|https?://)")
+_WORD_RE = re.compile(r"[A-Za-z]{3,}")
+_UNLINKED_DEF_MIN_WORDS = 3
+_SUP_NUMBER_RE = re.compile(r"<sup>\d+</sup>")
+
+
+def _unlinked_footnote_ref_re(number: str) -> re.Pattern:
+    """素の`<sup>N</sup>`のうち、脚注参照とみなせるものにマッチするパターンを返す。
+
+    数式中の上付き数字（`σ<sup>2</sup>`、`O(N<sup>3</sup>)`、`10<sup>4</sup>`等）と区別するため、
+    直前が2文字以上の小文字（英単語の末尾。例: `form<sup>2</sup>`）か、句読点・閉じ括弧
+    （空白1つを挟んでもよい。例: `estimates.<sup>1</sup>`、`(1.0, 1.1). <sup>5</sup>`）の
+    場合のみ参照とみなす。
+    """
+    return re.compile(rf"(?:(?<=[a-z]{{2}})|(?<=[.,;:)])[ \t]?)<sup>{number}</sup>")
+
+
+def _capture_unlinked_footnotes(markdown_text: str, footnotes: dict[str, str]) -> str:
+    """リンク無しの脚注参照・アンカー無しの脚注定義を捕捉し、参照を`[^N]`へ置き換える。
+
+    定義は段落先頭の`<sup>N</sup>`で始まり、本文らしい書き出しを持つ段落に限る。
+    著者所属ブロック（`<sup>1</sup>The Broad Institute ... <sup>2</sup>Dept. ...`）は
+    段落内に別の`<sup>N</sup>`を含むことで区別して除外する。参照は、定義より前にある
+    脚注参照らしい`<sup>N</sup>`のうち最も定義に近いもの（同じページ内の参照）を採用する。
+    参照が見つからない定義も、脚注であることに変わりはないため定義としては捕捉する。
+    捕捉した定義は`_FOOTNOTE_PLACEHOLDER`へ置き換え、`footnotes`へ格納する。
+    """
+    definitions: list[tuple[int, int, str, str]] = []
+    for match in UNLINKED_FOOTNOTE_DEF_RE.finditer(markdown_text):
+        number, text = match.group(1), match.group(2).strip()
+        if number in footnotes or any(d[2] == number for d in definitions):
+            continue
+        if _SUP_NUMBER_RE.search(text):
+            continue
+        if not _UNLINKED_DEF_TEXT_START_RE.match(text):
+            continue
+        if len(_WORD_RE.findall(text)) < _UNLINKED_DEF_MIN_WORDS:
+            continue
+        definitions.append((match.start(), match.end(), number, text))
+
+    # (start, end, 置換文字列)。定義の除去と参照の置換をまとめて後ろから適用する。
+    replacements: list[tuple[int, int, str]] = []
+    for def_start, def_end, number, text in definitions:
+        footnotes[number] = text
+        replacements.append((def_start, def_end, _FOOTNOTE_PLACEHOLDER))
+        refs = list(_unlinked_footnote_ref_re(number).finditer(markdown_text, 0, def_start))
+        if refs:
+            ref = refs[-1]
+            replacements.append((ref.start(), ref.end(), f"[^{number}]"))
+
+    for start, end, replacement in sorted(replacements, reverse=True):
+        markdown_text = markdown_text[:start] + replacement + markdown_text[end:]
+    return markdown_text
 
 
 def fix_footnotes(markdown_text: str) -> str:
@@ -120,6 +178,7 @@ def fix_footnotes(markdown_text: str) -> str:
 
     定義側のページアンカーspanが省略されている脚注（`FOOTNOTE_DEF_NO_ANCHOR_RE`参照）も
     フォールバックで捕捉するため、通常はこの関数だけで脚注に起因する文分断は解消される。
+    参照・定義の両方がリンク/アンカー無しで出力される論文は`_capture_unlinked_footnotes`で扱う。
     """
     footnotes: dict[str, str] = {}
 
@@ -145,11 +204,18 @@ def fix_footnotes(markdown_text: str) -> str:
 
         markdown_text = FOOTNOTE_DEF_NO_ANCHOR_RE.sub(_capture_fallback, markdown_text)
 
+    # リンク付き参照・アンカー付き定義が1件も無い場合のみ、素の`<sup>N</sup>`を脚注として
+    # 扱うフォールバックを試す（既存形式で出力される論文の挙動は変えない）。
+    if not footnotes and not referenced_numbers:
+        markdown_text = _capture_unlinked_footnotes(markdown_text, footnotes)
+
     while _FOOTNOTE_PLACEHOLDER in markdown_text:
         idx = markdown_text.index(_FOOTNOTE_PLACEHOLDER)
         before = markdown_text[:idx]
         after = markdown_text[idx + len(_FOOTNOTE_PLACEHOLDER) :]
-        if _CONTINUATION_NEXT_RE.match(after):
+        # `_capture_unlinked_footnotes`の定義パターンは後続の空行を消費しないため、
+        # 空行を読み飛ばした先で継続判定する。
+        if _CONTINUATION_NEXT_RE.match(after.lstrip("\n")):
             markdown_text = before.rstrip() + " " + after.lstrip()
         else:
             markdown_text = before.rstrip() + "\n\n" + after.lstrip("\n")
@@ -382,7 +448,8 @@ def fix_year_end_author_references(markdown_text: str) -> str:
 HEADING_LINE_RE = re.compile(r"^#{1,6}\s")
 IMAGE_ONLY_LINE_RE = re.compile(r"^!\[[^\]]*\]\([^)]*\)$")
 HR_ONLY_LINE_RE = re.compile(r"^(-{3,}|\*{3,}|_{3,})$")
-CAPTION_START_RE = re.compile(r"^(Figure|Table)\s+\d+\s*:", re.IGNORECASE)
+# キャプション区切りは`Figure N:`形式と`Figure N.`形式（ICML等）の両方に対応（`Figure 1.5`等の小数は除外）。
+CAPTION_START_RE = re.compile(r"^(Figure|Table)\s+\d+\s*(?::|\.(?!\d))", re.IGNORECASE)
 LOWERCASE_START_RE = re.compile(r"^[a-z]")
 # 文末として妥当な終端文字。ピリオド等に加え、$（数式の終端）・)"'等も許容する。
 SENTENCE_END_RE = re.compile(r"[.!?:;)\"'”’$]\s*$")
