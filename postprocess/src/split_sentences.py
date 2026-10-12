@@ -31,13 +31,15 @@ EMPTY_SPAN_ANCHOR_RE = re.compile(r'<span id="[^"]*"></span>')
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
 IMAGE_ONLY_RE = re.compile(r"^!\[[^\]]*\]\([^)]*\)$")
 HR_ONLY_RE = re.compile(r"^(-{3,}|\*{3,}|_{3,})$")
-CAPTION_RE = re.compile(r"^(Figure|Table)\s+\d+\s*:", re.IGNORECASE)
+# キャプション区切りは`Figure N:`形式と`Figure N.`形式（ICML等）の両方に対応（`Figure 1.5`等の小数は除外）。
+CAPTION_RE = re.compile(r"^(Figure|Table)\s+\d+\s*(?::|\.(?!\d))", re.IGNORECASE)
+CAPTION_LABEL_ONLY_RE = re.compile(r"^(Figure|Table)\s+\d+\.$", re.IGNORECASE)
 FOOTNOTE_DEF_RE = re.compile(r"^\[\^(\d+)\]:\s*(.*)$", re.DOTALL)
 REFERENCES_HEADING_TEXT = "References"
 
 # pysbdが誤って文境界と誤認しやすい既知の略語。マッチしたピリオドを一時的に
 # プレースホルダへ退避してから分割し、分割後に元へ戻す。
-ABBREV_RE = re.compile(r"\b(e\.g|i\.e|cf|etc|vs|Fig|Eq|Sec|No|approx)\.", re.IGNORECASE)
+ABBREV_RE = re.compile(r"\b(e\.g|i\.e|cf|etc|vs|Figs?|Eqns?|Eqs?|Secs?|No|approx)\.", re.IGNORECASE)
 ABBREV_PLACEHOLDER = "․"  # ONE DOT LEADER（本文中には通常出現しない）
 
 # $...$ / $$...$$ をpysbdに渡す前に退避し、数式内のピリオドでの誤分割を防ぐ。
@@ -159,14 +161,25 @@ def classify_and_split(blocks: list[str]) -> list[Record]:
                 )
             continue
 
-        if in_references:
-            # 参照文献は段落単位（extract_pdf.py側で1エントリ1段落に整形済み）でレコード化する
+        if in_references and not CAPTION_RE.match(block):
+            # 参照文献は段落単位（extract_pdf.py側で1エントリ1段落に整形済み）でレコード化する。
+            # 参考文献ページ上の図のキャプションはReferences節内に置かれるが、参照文献ではないため
+            # 通常のキャプションとして扱う
             order += 1
             records.append(Record(order=order, type="reference", heading_level=None, text=block))
             continue
 
         block_type = "caption" if CAPTION_RE.match(block) else "body"
-        for sentence in split_sentences(block):
+        sentences = split_sentences(block)
+        if (
+            block_type == "caption"
+            and len(sentences) > 1
+            and CAPTION_LABEL_ONLY_RE.match(sentences[0])
+        ):
+            # `Figure 1.`形式のキャプションはpysbdがラベル直後のピリオドで分割してしまうため、
+            # ラベルだけの断片を次の文へ結合する
+            sentences = [f"{sentences[0]} {sentences[1]}", *sentences[2:]]
+        for sentence in sentences:
             order += 1
             records.append(Record(order=order, type=block_type, heading_level=None, text=sentence))
 
