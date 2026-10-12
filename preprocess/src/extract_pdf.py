@@ -240,6 +240,10 @@ BLANK_LINES_RE = re.compile(r"\n\s*\n")
 # marker-pdfが見出しとして認識せず、直後の著者名テキストと同一段落に連結して出力した
 # "References"（空行の直後に単語として出現し、直後に大文字始まりの語が続く）。
 INLINE_REFERENCES_START_RE = re.compile(r"(?<=\n\n)References\s+(?=[A-Z])")
+# 上記に加え、直前の謝辞（Acknowledgements）等の段落末尾にまで連結されたケース
+# （"...funding by Google-DeepMind. References Jason Abrevaya, ..."）。文末句読点の直後に
+# 出現するものに限定し、本文中の"References to ..."のような用法との誤爆を避ける。
+MIDPARAGRAPH_REFERENCES_START_RE = re.compile(r"(?<=[.!?])[ \t]+References\s+(?=[A-Z])")
 
 
 def normalize_references_heading(markdown_text: str) -> str:
@@ -249,14 +253,20 @@ def normalize_references_heading(markdown_text: str) -> str:
     直後の著者名テキストと同一段落で出力することがある。後続の`fix_*_references`系
     関数はいずれも`REFERENCES_HEADING_RE`で見出しを検出できて初めて動作するため、
     見出し化されないままだと参考文献リストの分割処理が一切適用されない。
-    既に"References"見出しが存在する場合は何もしない。
+    段落先頭に出現するものを優先し、無ければ直前段落の末尾に連結されたもの（段落途中）を
+    段落ごと分割して見出し化する。既に"References"見出しが存在する場合は何もしない。
     """
     if REFERENCES_HEADING_RE.search(markdown_text):
         return markdown_text
     match = INLINE_REFERENCES_START_RE.search(markdown_text)
-    if not match:
-        return markdown_text
-    return markdown_text[: match.start()] + "## References\n\n" + markdown_text[match.end() :]
+    if match:
+        return markdown_text[: match.start()] + "## References\n\n" + markdown_text[match.end() :]
+    match = MIDPARAGRAPH_REFERENCES_START_RE.search(markdown_text)
+    if match:
+        return (
+            markdown_text[: match.start()] + "\n\n## References\n\n" + markdown_text[match.end() :]
+        )
+    return markdown_text
 
 
 def fix_references_line_breaks(markdown_text: str) -> str:
@@ -396,9 +406,32 @@ def fix_author_year_references(markdown_text: str) -> str:
 # そのまま西暦年を置くスタイル（「名 姓, 名 姓, ..., and 名 姓. Title. Venue, YYYY.」の
 # ようなNeurIPS/ICML系の参考文献に多い）を対象とする。著者名は"and"接続・ハイフン複合姓・
 # アクセント文字の欠落等でパターンが多様なため、次エントリ側の形状チェックは最小限に留める。
-YEAR_END_ENTRY_BOUNDARY_RE = re.compile(r"(?:(?<=\d{4}\.)|(?<=\d{4}[a-z]\.))\s+(?=[A-Z][a-z])")
+# 次エントリ先頭の2文字目は、ASCII小文字に加え非ASCIIの小文字（"Jörn"）・抽出時に分離した
+# アクセント記号（"J¨orn"）・イニシャル連続（"C.E. Rasmussen"）も許容する。
+# 直前エントリの末尾は`YYYY.`のほか、URLの付いたエントリ（"... 2017. URL [...](...)."）の
+# `).`も候補とし、こちらは直前がMarkdownリンクの閉じ括弧である場合のみ採用する
+# （`_year_end_boundaries`）。
+YEAR_END_ENTRY_BOUNDARY_RE = re.compile(
+    r"(?:(?<=\d{4}\.)|(?<=\d{4}[a-z]\.)|(?<=\)\.))\s+"
+    r"(?=[A-Z](?:[a-z\u00df-\u00ff\u0100-\u024f\u00a8\u00b4`\u02c6\u02dc]|\.[A-Z]\.))"
+)
+MARKDOWN_LINK_END_RE = re.compile(r"\]\([^()\s]+\)\.$")
+# 1段落に複数エントリが連結された「未分割」段落とみなす、段落内境界数の下限。既に1エントリ
+# 1段落に整形済みのセクションでも、エントリ内部の"2017. In ..."等で境界が1件誤検出される
+# ことはありうるため、1件では未分割と判定しない。
+MIN_BOUNDARIES_IN_UNSPLIT_BLOCK = 2
 # fix_footnotesが文書末尾に脚注ブロックを追加する際の区切り（`\n\n---\n\n`）。
 FOOTNOTE_BLOCK_SEPARATOR_RE = re.compile(r"\n\n---\n\n")
+
+
+def _year_end_boundaries(text: str) -> list[re.Match[str]]:
+    """`YEAR_END_ENTRY_BOUNDARY_RE`の候補のうち、エントリ境界として採用できるものを返す。"""
+    return [
+        match
+        for match in YEAR_END_ENTRY_BOUNDARY_RE.finditer(text)
+        if text[match.start() - 2 : match.start()] != ")."
+        or MARKDOWN_LINK_END_RE.search(text, 0, match.start())
+    ]
 
 
 def fix_year_end_author_references(markdown_text: str) -> str:
@@ -408,8 +441,12 @@ def fix_year_end_author_references(markdown_text: str) -> str:
     対象とするため、「名 姓, 名 姓, ..., and 名 姓. Title. Venue, YYYY.」のように文末に
     西暦年をそのまま置くスタイルには対応できない。本関数はその補完として、直前のエントリ
     末尾が`YYYY.`で終わり、直後が新しい著者名らしき大文字始まりの単語列である位置を
-    境界候補とする。対象セクションが既に複数段落（空行区切り）に分割済みの場合は
-    二重処理を避けるため何もしない。境界が1件も見つからない場合も元のテキストを返す。
+    境界候補とする。
+    marker-pdfはページ単位で段落を区切るため、未分割のセクションでも複数段落になりうる
+    （ページ跨ぎでエントリが途中で切れることもある）。また参考文献ページ上の図は画像参照・
+    キャプションとして段落間に挟まる。そこで画像・キャプション段落を除いた段落を結合してから
+    分割し、除いた段落は参考文献の後ろへ移す。境界を`MIN_BOUNDARIES_IN_UNSPLIT_BLOCK`件以上
+    含む段落が1つも無い場合は分割済みとみなして何もしない（二重処理の防止）。
     """
     heading_match = REFERENCES_HEADING_RE.search(markdown_text)
     if not heading_match:
@@ -418,9 +455,8 @@ def fix_year_end_author_references(markdown_text: str) -> str:
     section_start = heading_match.end()
     next_heading_match = NEXT_HEADING_RE.search(markdown_text, section_start)
     section_end = next_heading_match.start() if next_heading_match else len(markdown_text)
-    # 見出しが無い脚注ブロック（fix_footnotesが`\n\n---\n\n`区切りで文書末尾に挿入する）が
-    # 後続する場合、それを参考文献セクションに含めてしまうと脚注間の空行を「既に分割済み」
-    # と誤検出してしまうため、脚注ブロックの手前でセクションを打ち切る。
+    # 見出しが無い脚注ブロック（fix_footnotesが`\n\n---\n\n`区切りで文書末尾に挿入する）は
+    # 参考文献ではないため、脚注ブロックの手前でセクションを打ち切る。
     footnote_block_match = FOOTNOTE_BLOCK_SEPARATOR_RE.search(
         markdown_text, section_start, section_end
     )
@@ -428,20 +464,28 @@ def fix_year_end_author_references(markdown_text: str) -> str:
         section_end = footnote_block_match.start()
 
     section = markdown_text[section_start:section_end]
-    combined = section.strip()
-    if BLANK_LINES_RE.search(combined):
+    # 箇条書き（`fix_bulleted_references`）・番号付き（`fix_references_line_breaks`）スタイルは
+    # 整形済みのため対象外
+    if re.search(r"^(?:- |\[1\] )", section, re.MULTILINE):
         return markdown_text
 
+    blocks = [b.strip() for b in BLANK_LINES_RE.split(section) if b.strip()]
+    interruptors = [b for b in blocks if IMAGE_ONLY_LINE_RE.match(b) or CAPTION_START_RE.match(b)]
+    reference_blocks = [b for b in blocks if b not in interruptors]
+    if not any(
+        len(_year_end_boundaries(b)) >= MIN_BOUNDARIES_IN_UNSPLIT_BLOCK for b in reference_blocks
+    ):
+        return markdown_text
+
+    combined = " ".join(reference_blocks)
     entries: list[str] = []
     start = 0
-    for match in YEAR_END_ENTRY_BOUNDARY_RE.finditer(combined):
+    for match in _year_end_boundaries(combined):
         entries.append(combined[start : match.start()].strip())
         start = match.end()
-    if not entries:
-        return markdown_text
     entries.append(combined[start:].strip())
 
-    new_section_text = "\n\n" + "\n\n".join(entries) + "\n\n"
+    new_section_text = "\n\n" + "\n\n".join(entries + interruptors) + "\n\n"
     return markdown_text[:section_start] + new_section_text + markdown_text[section_end:]
 
 

@@ -161,8 +161,10 @@ def classify_and_split(blocks: list[str]) -> list[Record]:
                 )
             continue
 
-        if in_references:
-            # 参照文献は段落単位（extract_pdf.py側で1エントリ1段落に整形済み）でレコード化する
+        if in_references and not CAPTION_RE.match(block):
+            # 参照文献は段落単位（extract_pdf.py側で1エントリ1段落に整形済み）でレコード化する。
+            # 参考文献ページ上の図のキャプションはReferences節内に置かれるが、参照文献ではないため
+            # 通常のキャプションとして扱う
             order += 1
             records.append(Record(order=order, type="reference", heading_level=None, text=block))
             continue
