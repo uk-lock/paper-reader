@@ -111,9 +111,10 @@ _CONTINUATION_NEXT_RE = re.compile(r"\A[a-z]")
 # 本文参照・定義の両方がリンク/アンカー無しの素の`<sup>N</sup>`で出力される論文（ICML形式等）
 # 向けのフォールバック。段落先頭の`<sup>N</sup>`を定義候補とする。
 UNLINKED_FOOTNOTE_DEF_RE = re.compile(r"\n\n<sup>(\d+)</sup>[ \t]*(.+?)(?=\n\n|\Z)", re.DOTALL)
-# 定義本文の書き出し（大文字始まりの文、またはURL）。数式段落（`<sup>1</sup> Z p0(ω)`等）を
+# 定義本文の書き出し（大文字始まりの文、小文字2文字以上の英単語（`available at ...`、
+# `we use ...`等、小文字で書き出す脚注）、またはURL）。数式段落（`<sup>1</sup> Z p0(ω)`等）を
 # 除外するため、書き出しに加えて3文字以上の英単語を最低3語含むことも条件とする。
-_UNLINKED_DEF_TEXT_START_RE = re.compile(r"\A(?:[A-Z]|https?://)")
+_UNLINKED_DEF_TEXT_START_RE = re.compile(r"\A(?:[A-Z]|[a-z]{2,}\b|https?://)")
 _WORD_RE = re.compile(r"[A-Za-z]{3,}")
 _UNLINKED_DEF_MIN_WORDS = 3
 _SUP_NUMBER_RE = re.compile(r"<sup>\d+</sup>")
@@ -124,10 +125,10 @@ def _unlinked_footnote_ref_re(number: str) -> re.Pattern:
 
     数式中の上付き数字（`σ<sup>2</sup>`、`O(N<sup>3</sup>)`、`10<sup>4</sup>`等）と区別するため、
     直前が2文字以上の小文字（英単語の末尾。例: `form<sup>2</sup>`）か、句読点・閉じ括弧
-    （空白1つを挟んでもよい。例: `estimates.<sup>1</sup>`、`(1.0, 1.1). <sup>5</sup>`）の
-    場合のみ参照とみなす。
+    （いずれも空白1つを挟んでもよい。例: `dataset <sup>6</sup>`、`estimates.<sup>1</sup>`、
+    `(1.0, 1.1). <sup>5</sup>`）の場合のみ参照とみなす。
     """
-    return re.compile(rf"(?:(?<=[a-z]{{2}})|(?<=[.,;:)])[ \t]?)<sup>{number}</sup>")
+    return re.compile(rf"(?:(?<=[a-z]{{2}})|(?<=[.,;:)]))[ \t]?<sup>{number}</sup>")
 
 
 def _capture_unlinked_footnotes(markdown_text: str, footnotes: dict[str, str]) -> str:
@@ -231,7 +232,8 @@ def fix_footnotes(markdown_text: str) -> str:
     return markdown_text
 
 
-REFERENCES_HEADING_RE = re.compile(r"^#+\s+References[ \t]*$", re.MULTILINE)
+# marker-pdfは見出しを太字で出力することがある（`## **References**`）ため、`**`の有無は問わない。
+REFERENCES_HEADING_RE = re.compile(r"^#+\s+(?:\*\*)?References(?:\*\*)?[ \t]*$", re.MULTILINE)
 # 本処理は04_01_fix_heading_structure.md（見出しレベルの整備）より前の生の抽出結果に対して
 # 実行されるため、見出しレベルはまだ崩れている可能性がある（例: Referencesが誤ってH1、
 # 次章がH4等）。そのため「次に見出しが来るまで」をH2限定にせず、レベル不問で判定する。
